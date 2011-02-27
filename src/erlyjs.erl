@@ -70,7 +70,7 @@ shell() ->
 %% @end 
 %%--------------------------------------------------------------------
 create_scanner() ->
-    create_scanner("src/erlyjs/erlyjs_scan", "ebin").
+    create_scanner("src/erlyjs_scan", "ebin").
 
 %%--------------------------------------------------------------------
 %% @spec () -> any()
@@ -79,7 +79,7 @@ create_scanner() ->
 %% @end 
 %%--------------------------------------------------------------------    
 create_parser() ->
-    create_parser("src/erlyjs/erlyjs_parser", "ebin").
+    create_parser("src/erlyjs_parser", "ebin").
      
 scanner_src() ->
      filename:join(src_erlyjs_dir(), "erlyjs_scan.xrl").
@@ -104,7 +104,7 @@ dump_src(Module) ->
 
 src_erlyjs_dir() ->
      {file, Ebin} = code:is_loaded(?MODULE),
-     filename:join([filename:dirname(filename:dirname(Ebin)), "src", "erlyjs"]).
+     filename:join([filename:dirname(filename:dirname(Ebin)), "src"]).
 
 
 create_scanner(Path, Outdir) ->

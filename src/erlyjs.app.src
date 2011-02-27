@@ -1,0 +1,6 @@
+{application, erlyjs, 
+ [{description, "Javascript to Erlang compiler"},
+  {vsn, "0.1.0"},
+  {applications, [kernel, stdlib, sasl]},
+  {env, []}
+]}.

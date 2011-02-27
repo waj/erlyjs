@@ -1,0 +1,4 @@
+*.beam
+ebin/erlyjs.app
+src/erlyjs_parser.erl
+src/erlyjs_scan.erl

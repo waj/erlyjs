@@ -1,11 +1,10 @@
-ERL=erl
+all: compile
 
-all:
-	$(ERL) -make
+compile:
+	./rebar compile
 
-run:
-	$(ERL) -pa `pwd`/ebin
-	
 clean:
-	rm -fv ebin/*.beam
-	rm -fv erl_crash.dump
+	./rebar clean
+
+tests: compile
+	erl -pa ebin -noshell -run erlyjs_testsuite run -s init stop
