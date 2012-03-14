@@ -1,6 +1,6 @@
 // Mandatory. Return here a description of the test case.
 function test_description() {
-    return "For statement";
+    return "Increment (postfix) '++' operator test";
 }
 
 // Mandatory. Return here an array of arguments the testsuite will use
@@ -11,7 +11,7 @@ function test_args() {
 
 // Mandatory. Return here the expected test result.
 function test_ok() {
-    return 861;
+    return 1;
 }
 
 // Optional. Provide here any global code.
@@ -21,8 +21,7 @@ function test_ok() {
 // Testsuite invokes this function with the arguments from test_args()
 // and compares the return value with the expected result from test_ok().
 function test() {
-  var r = 0;
-  for (var i = 0; i < 42; i++)
-    r += i;
-  return r;
+    var a=1, b;
+    b = a++;
+    return b++;
 }

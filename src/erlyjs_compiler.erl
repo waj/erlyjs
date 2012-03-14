@@ -277,11 +277,19 @@ ast({op, {Op, _}, In1, In2}, {Ctx, Trav}) ->
     {Out1, _, #trav{var_counter = VarCounter1}} = p_t(In1, Ctx, Trav),
     {Out2, _, #trav{var_counter = VarCounter2}} = p_t(In2, Ctx, Trav#trav{var_counter = VarCounter1}),
     {{erlyjs_operators:ast(Op, Out1, Out2), #ast_inf{}}, {Ctx, Trav#trav{var_counter = VarCounter2}}};
-ast({op, {{Op, postfix}, _}, In1, In2}, {Ctx, Trav}) ->
-    %% TODO: fix this, code below is prefix operator
-    {Out1, _, #trav{var_counter = VarCounter1}} = p_t(In1, Ctx, Trav),
-    {Out2, _, #trav{var_counter = VarCounter2}} = p_t(In2, Ctx, Trav#trav{var_counter = VarCounter1}),
-    {{erlyjs_operators:ast(Op, Out1, Out2), #ast_inf{}}, {Ctx, Trav#trav{var_counter = VarCounter2}}};
+ast({op, {Op, postfix, _}, {identifier, _, Name}}, {Ctx, Trav}) ->
+    {{In, _}, _} = var_ast(Name, Ctx, Trav),
+    {{In1, _}, {_, Trav1}} = var_ast(Name, Ctx#js_ctx{action = set}, Trav),
+    case erl_syntax:is_leaf(In) of
+    true -> % must be a local variable
+        Ast = erl_syntax:match_expr(In1, erlyjs_operators:ast(Op, In)),
+        {{erl_syntax:block_expr([Ast, In]), #ast_inf{}}, {Ctx, Trav1}};
+    false -> % must be a global variable then
+        Ast1 = erl_syntax:match_expr(In1, In),
+        KV = [erl_syntax:atom(global_prefix(Name)), erlyjs_operators:ast(Op, In1)],
+        Ast2 = erl_syntax:application(none, erl_syntax:atom(put), KV),
+        {{erl_syntax:block_expr([Ast1, Ast2, In1]), #ast_inf{}}, {Ctx, Trav1}}
+    end;
 ast({op, Op, In1, In2, In3}, {Ctx, Trav}) ->
     {Out1, _, #trav{var_counter = VarCounter1}} = p_t(In1, Ctx, Trav),
     {Out2, _, #trav{var_counter = VarCounter2}} = p_t(In2, Ctx, Trav#trav{var_counter = VarCounter1}),

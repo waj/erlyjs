@@ -2,9 +2,9 @@
 %%% File:      erlyjs_parser.xrl
 %%% @author    Roberto Saccon <rsaccon@gmail.com> [http://rsaccon.com]
 %%% @copyright 2007 Roberto Saccon
-%%% @doc  
+%%% @doc
 %%% ErlyJS Parser
-%%% @end  
+%%% @end
 %%%
 %%% The MIT License
 %%%
@@ -36,7 +36,7 @@
 %%%-------------------------------------------------------------------
 
 
-Nonterminals 
+Nonterminals
     Program
     MultiplicativeExpression
     UnaryExpression
@@ -119,20 +119,19 @@ Nonterminals
     .
 
 
-Terminals 
-    float integer string new this null true false delete void typeof try throw with break return 
+Terminals
+    float integer string new this null true false delete void typeof try throw with break return
     identifier regexp function var instanceof in if else switch do while for case default
     continue finally catch
     '+' '-' '*' '/' '%' ':' '~' '!' '*=' '/=' '%=' '+=' '-=' '<<=' '>>=' '>>>='
-    '&=' '^=' '|=' '=' ';' '?' '<<' '>>' '>>>' '<' '>' 
-    '(' ')' '[' ']' '.' ',' '++' '--' '&&' '===' '==' '<=' '>=' '!=' '!==' 
+    '&=' '^=' '|=' '=' ';' '?' '<<' '>>' '>>>' '<' '>'
+    '(' ')' '[' ']' '.' ',' '++' '--' '&&' '===' '==' '<=' '>=' '!=' '!=='
     '{' '}' '&' '^' '||' '|'
     .
 
 
 Left 100 FunctionExpression.
 Left 100 LiteralField.
-Left 100 PostfixExpression.
 
 
 Rootsymbol Program.
@@ -142,7 +141,7 @@ Rootsymbol Program.
 Number -> float : '$1'.
 Number -> integer : '$1'.
 
-%% Primary Expressions 
+%% Primary Expressions
 PrimaryExpression -> SimpleExpression : '$1'.
 PrimaryExpression -> FunctionExpression : '$1'.
 PrimaryExpression -> ObjectLiteral : '$1'.
@@ -158,13 +157,13 @@ SimpleExpression -> ParenthesizedExpression : '$1'.
 SimpleExpression -> ArrayLiteral : '$1'.
 ParenthesizedExpression -> '(' Expression ')' : '$2'.
 
-%% Function Expressions 
+%% Function Expressions
 FunctionExpression -> AnonymousFunction : '$1'.
 FunctionExpression -> NamedFunction : '$1'.
 
 %% Object Literals TODO
-ObjectLiteral -> '{' '}' : '$1'. 
-ObjectLiteral -> '{' FieldList '}'  : '$2'. 
+ObjectLiteral -> '{' '}' : '$1'.
+ObjectLiteral -> '{' FieldList '}'  : '$2'.
 FieldList -> LiteralField : ['$1'].
 FieldList -> FieldList ',' LiteralField : '$1' ++ ['$3'].
 LiteralField -> identifier ':' AssignmentExpression : '$1'.
@@ -175,7 +174,7 @@ ElementList -> '$empty' : [].
 ElementList -> ElementList ',' LiteralElement : '$1' ++ ['$3'].
 LiteralElement -> AssignmentExpression : '$1'.
 
-%% Left-Side Expressions 
+%% Left-Side Expressions
 LeftSideExpression -> CallExpression : '$1'.
 LeftSideExpression -> ShortNewExpression : '$1'.
 CallExpression -> PrimaryExpression : '$1'.
@@ -194,22 +193,22 @@ MemberOperator -> '.' identifier : ['$2'].
 MemberOperator ->  MemberOperator '.' identifier : '$1' ++ ['$3'].
 Arguments -> '(' ')' : {first_el('$1'), []}.
 Arguments -> '(' ArgumentList ')' : {first_el('$1'), '$2'}.
-ArgumentList -> AssignmentExpression : ['$1'].  
+ArgumentList -> AssignmentExpression : ['$1'].
 ArgumentList -> ArgumentList ',' AssignmentExpression : '$1' ++ ['$3'].
 
 
 %% Postfix Operators
 PostfixExpression -> LeftSideExpression : '$1'.
-PostfixExpression -> LeftSideExpression '++' : {op, postfix('$1'), '$2'}.
-PostfixExpression -> LeftSideExpression '--' : {op, postfix('$1'), '$2'}.
+PostfixExpression -> LeftSideExpression '++' : {op, postfix('$2'), '$1'}.
+PostfixExpression -> LeftSideExpression '--' : {op, postfix('$2'), '$1'}.
 
 %% Unary Operators
 UnaryExpression -> PostfixExpression : '$1'.
 UnaryExpression -> delete LeftSideExpression : {op, '$1', '$2'}. % TODO
 UnaryExpression -> void UnaryExpression : {op, '$1', '$2'}. % TODO
 UnaryExpression -> typeof UnaryExpression : {op, '$1', '$2'}. % TODO
-UnaryExpression -> '++' LeftSideExpression : {op, '$1', '$2'}.
-UnaryExpression -> '--' LeftSideExpression : {op, '$1', '$2'}.
+UnaryExpression -> '++' UnaryExpression : {op, '$1', '$2'}.
+UnaryExpression -> '--' UnaryExpression : {op, '$1', '$2'}.
 UnaryExpression -> '+' UnaryExpression : {op, '$1', '$2'}.
 UnaryExpression -> '-' UnaryExpression : {op, '$1', '$2'}.
 UnaryExpression -> '~' UnaryExpression : {op, '$1', '$2'}.
@@ -265,29 +264,30 @@ LogicalOrExpression -> LogicalOrExpression '||' LogicalAndExpression : {op, '$2'
 
 %% Conditional Operator
 ConditionalExpression -> LogicalOrExpression : '$1'.
-ConditionalExpression -> LogicalOrExpression '?' AssignmentExpression ':' AssignmentExpression : {op, 'cond', '$1', '$3', '$5'}. 
+ConditionalExpression -> LogicalOrExpression '?' AssignmentExpression ':' AssignmentExpression : {op, 'cond', '$1', '$3', '$5'}.
 
-%% Assignment Operators 
-AssignmentExpression -> ConditionalExpression : '$1'. 
+%% Assignment Operators
+AssignmentExpression -> ConditionalExpression : '$1'.
 AssignmentExpression -> LeftSideExpression '=' AssignmentExpression : {assign, '$2', '$1', '$3'}.
 AssignmentExpression -> LeftSideExpression CompoundAssignment AssignmentExpression  : {assign, '$2', '$1', '$3'}.
 CompoundAssignment -> '*=' : '$1'.
-CompoundAssignment -> '/=' : '$1'. 
-CompoundAssignment -> '%=' : '$1'. 
-CompoundAssignment -> '+=' : '$1'. 
-CompoundAssignment -> '-=' : '$1'. 
-CompoundAssignment -> '<<=' : '$1'. 
-CompoundAssignment -> '>>=' : '$1'. 
+CompoundAssignment -> '/=' : '$1'.
+CompoundAssignment -> '%=' : '$1'.
+CompoundAssignment -> '+=' : '$1'.
+CompoundAssignment -> '-=' : '$1'.
+CompoundAssignment -> '<<=' : '$1'.
+CompoundAssignment -> '>>=' : '$1'.
 CompoundAssignment -> '>>>=' : '$1'. % TODO
-CompoundAssignment -> '&=' : '$1'. 
-CompoundAssignment -> '^=' : '$1'. 
-CompoundAssignment -> '|=' : '$1'. 
+CompoundAssignment -> '&=' : '$1'.
+CompoundAssignment -> '^=' : '$1'.
+CompoundAssignment -> '|=' : '$1'.
 
-%% Expressions 
+%% Expressions
 %% Expression -> AssignmentExpression : ['$1'].                             % not working
 %% Expression -> Expression ',' AssignmentExpression : '$1' ++ ['$3'].      % not working
 Expression -> AssignmentExpression : '$1'.                                  % ok, but shouldn't
-Expression -> Expression ',' AssignmentExpression : ['$1', '$3'].           % ????????????????? 
+Expression -> Expression ',' AssignmentExpression : ['$1', '$3'].           % ?????????????????
+
 OptionalExpression -> Expression : '$1'.
 OptionalExpression -> '$empty' : [].
 
@@ -308,13 +308,13 @@ Statement -> BreakStatement OptionalSemicolon  : '$1'.
 Statement -> ReturnStatement OptionalSemicolon  : '$1'.
 Statement -> ThrowStatement OptionalSemicolon : '$1'.
 Statement -> TryStatement : '$1'.
-OptionalSemicolon -> ';' : '$1'. 
+OptionalSemicolon -> ';' : '$1'.
 OptionalSemicolon -> '$empty' : [].
 
-%% Empty Statement 
-EmptyStatement -> ';'. 
+%% Empty Statement
+EmptyStatement -> ';'.
 
-%% Expression Statement 
+%% Expression Statement
 ExpressionStatement -> Expression : '$1'.
 
 %% Variable Definition
@@ -325,13 +325,13 @@ VariableDeclaration -> identifier VariableInitializer : {'$1', '$2'}.
 VariableInitializer -> '$empty' : [].
 VariableInitializer -> '=' AssignmentExpression : '$2'.
 
-%% Block 
-Block -> '{' BlockStatements '}' : '$2'. 
+%% Block
+Block -> '{' BlockStatements '}' : '$2'.
 BlockStatements -> Statement : ['$1'].
-BlockStatements ->  BlockStatements  Statement : '$1' ++ ['$2'].    
+BlockStatements ->  BlockStatements  Statement : '$1' ++ ['$2'].
 
-%% Labeled Statements 
-LabeledStatement -> identifier ':' Statement : {label, '$2'}. 
+%% Labeled Statements
+LabeledStatement -> identifier ':' Statement : {label, '$2'}.
 
 %% If Statement
 IfStatement -> 'if' ParenthesizedExpression Statement  : {'if', '$2', '$3'}.
@@ -342,15 +342,15 @@ IfStatement -> 'if' ParenthesizedExpression Statement else Statement : {ifelse, 
 SwitchStatement -> switch ParenthesizedExpression '{' '}' : [].
 SwitchStatement -> switch ParenthesizedExpression '{' CaseGroups LastCaseGroup '}' : {switch, '$2', '$4', '$5'}.
 CaseGroups -> '$empty' : [].
-CaseGroups -> CaseGroups CaseGroup : '$1' ++ ['$2'].   
-CaseGroup -> CaseGuards BlockStatements : {'$1', '$2'}.       
-LastCaseGroup  -> CaseGuards BlockStatements : {'$1', '$2'}.  
+CaseGroups -> CaseGroups CaseGroup : '$1' ++ ['$2'].
+CaseGroup -> CaseGuards BlockStatements : {'$1', '$2'}.
+LastCaseGroup  -> CaseGuards BlockStatements : {'$1', '$2'}.
 CaseGuards -> CaseGuard : ['$1'].
-CaseGuards -> CaseGuards CaseGuard : '$1' ++ ['$2'].  
+CaseGuards -> CaseGuards CaseGuard : '$1' ++ ['$2'].
 CaseGuard -> 'case' Expression ':' : '$2'.
-CaseGuard -> default ':' : default. 
+CaseGuard -> default ':' : default.
 
-                                              
+
 %% Do-While Statement
 DoStatement -> do Statement while ParenthesizedExpression : {do_while, '$2', '$4'}.
 
@@ -363,25 +363,25 @@ ForStatement -> for '(' ForInBinding in Expression ')' Statement : '$1'. %% TODO
 ForInitializer -> '$empty' : [].
 ForInitializer -> Expression : '$1'.
 ForInitializer -> var VariableDeclarationList : {var, '$2'}.
-ForInBinding -> LeftSideExpression : '$1'.
+%ForInBinding -> LeftSideExpression : '$1'.
 ForInBinding -> var VariableDeclaration : '$1'.  %% TODO
 
 %% With Statement TODO
 WithStatement -> with ParenthesizedExpression Statement : '$1'.
 
-%% Continue and Break Statements 
+%% Continue and Break Statements
 ContinueStatement -> continue OptionalLabel : '$1'.
 BreakStatement  -> break OptionalLabel : '$1'.
 OptionalLabel -> '$empty' : [].
 OptionalLabel -> identifier : '$1'.
 
 %% Return Statement TODO
-ReturnStatement -> return OptionalExpression : {return, '$2'}. 
+ReturnStatement -> return OptionalExpression : {return, '$2'}.
 
 %% Throw Statement TODO
 ThrowStatement -> throw Expression : '$1'.
 
-%% Try Statement 
+%% Try Statement
 TryStatement -> try Block CatchClauses : '$1'.
 TryStatement -> try Block FinallyClause : '$1'.
 TryStatement -> try Block CatchClauses FinallyClause : '$1'.
@@ -390,7 +390,7 @@ CatchClauses -> CatchClauses CatchClause : '$1'.
 CatchClause -> catch '(' identifier ')' Block : '$1'.
 FinallyClause -> finally Block : '$1'.
 
-%% Function Definition 
+%% Function Definition
 FunctionDefinition -> NamedFunction : '$1'.
 AnonymousFunction -> function FormalParametersAndBody : {'$1'}.
 NamedFunction -> function identifier FormalParametersAndBody : {function, '$2', '$3'}.
@@ -399,7 +399,7 @@ FormalParameters -> '$empty' : [].
 FormalParameters -> identifier : ['$1'].
 FormalParameters -> FormalParameters ',' identifier : '$1' ++ ['$3'].
 
-%% Programs 
+%% Programs
 Program -> TopStatements : '$1'.
 TopStatements -> '$empty' : [].
 TopStatements -> TopStatements TopStatement : '$1' ++ ['$2'].
@@ -409,8 +409,8 @@ TopStatement -> FunctionDefinition  : '$1'.
 
 Erlang code.
 
-postfix({Op, Line}) -> {{Op, postfix}, Line}.
-    
+postfix({Op, Line}) -> {Op, postfix, Line}.
+
 first_el({First, _}) -> First.
-    
+
 list_third_el(L) ->  [X || {identifier, _ , X} <- L].
