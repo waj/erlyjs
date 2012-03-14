@@ -2,9 +2,9 @@
 %%% File:      erlyjs_operators.erl
 %%% @author    Roberto Saccon <rsaccon@gmail.com> [http://rsaccon.com]
 %%% @copyright 2008 Roberto Saccon
-%%% @doc  
+%%% @doc
 %%% Logical and binary Operators
-%%% @end  
+%%% @end
 %%%
 %%% The MIT License
 %%%
@@ -40,28 +40,28 @@
 %% API
 %%====================================================================
 %%--------------------------------------------------------------------
-%% @spec 
+%% @spec
 %% @doc
-%% @end 
+%% @end
 %%--------------------------------------------------------------------
 ast('++', Ast) ->
-    %% TODO: dynamic typechecking and implemenntation
+    %% TODO: dynamic typechecking and implementation
     erl_syntax:infix_expr(Ast, erl_syntax:operator('+'), erl_syntax:integer(1));
 ast('--', Ast) ->
-    %% TODO: dynamic typechecking and implemenntation
+    %% TODO: dynamic typechecking and implementation
     erl_syntax:infix_expr(Ast, erl_syntax:operator('-'), erl_syntax:integer(1));
 ast('-' = Op, Ast) ->
-    %% TODO: dynamic typechecking and implemenntation
+    %% TODO: dynamic typechecking and implementation
     erl_syntax:infix_expr(erl_syntax:integer(0), erl_syntax:operator(Op), Ast);
 ast('~', Ast) ->
-    %% TODO: dynamic typechecking and implemenntation
-    erl_syntax:prefix_expr(erl_syntax:operator('bnot'), Ast);   
+    %% TODO: dynamic typechecking and implementation
+    erl_syntax:prefix_expr(erl_syntax:operator('bnot'), Ast);
 ast('!', Ast) ->
     erl_syntax:case_expr(Ast, [
         erl_syntax:clause([erl_syntax:atom(false)], none, [erl_syntax:atom(true)]),
         erl_syntax:clause([erl_syntax:underscore()], none, [erl_syntax:atom(false)])]).
-           
-           
+
+
 ast('*' = Op, Ast1, Ast2) ->
     %% TODO: dynamic typechecking
     erl_syntax:infix_expr(Ast1, erl_syntax:operator(Op), Ast2);
@@ -70,7 +70,7 @@ ast('/' = Op, Ast1, Ast2) ->
     erl_syntax:infix_expr(Ast1, erl_syntax:operator(Op), Ast2);
 ast('%', Ast1, Ast2) ->
     %% TODO: dynamic typechecking
-    erl_syntax:infix_expr(Ast1, erl_syntax:operator('rem'), Ast2);    
+    erl_syntax:infix_expr(Ast1, erl_syntax:operator('rem'), Ast2);
 ast('+' = Op, Ast1, Ast2) ->
     %% TODO: dynamic typechecking
     erl_syntax:infix_expr(Ast1, erl_syntax:operator(Op), Ast2);
@@ -82,14 +82,14 @@ ast('<<', Ast1, Ast2) ->
     erl_syntax:infix_expr(Ast1, erl_syntax:operator("bsl"), Ast2);
 ast('>>', Ast1, Ast2) ->
     %% TODO: dynamic typechecking
-    erl_syntax:infix_expr(Ast1, erl_syntax:operator("bsr"), Ast2);  
+    erl_syntax:infix_expr(Ast1, erl_syntax:operator("bsr"), Ast2);
 ast('>>>', _Ast1, _Ast2) ->
     %% TODO: implementation and dynamic typechecking
-    %% right-shift 9 with 2 
+    %% right-shift 9 with 2
     %% <<Val:30, Ignore:2>> = <<9:32>>.
-    %% Result = <<0:2, Val:30>>.  
+    %% Result = <<0:2, Val:30>>.
     %% how do we handle negatie numbers (two complement format) ?
-    erl_syntax:atom(not_implemented_yet);    
+    erl_syntax:atom(not_implemented_yet);
 ast('<' = Op, Ast1, Ast2) ->
     %% TODO: dynamic typechecking
     erl_syntax:infix_expr(Ast1, erl_syntax:operator(Op), Ast2);
@@ -129,16 +129,16 @@ ast('&&', Ast1, Ast2) ->
 ast('||', Ast1, Ast2) ->
     %% TODO: dynamic typechecking
     erl_syntax:infix_expr(Ast1, erl_syntax:operator('or'), Ast2);
-ast(Unknown, _, _) ->    
+ast(Unknown, _, _) ->
     throw({error, lists:concat(["Unknown operator: ", Unknown])}).
-  
-    
+
+
 ast('cond', Ast1, Ast2, Ast3) ->
-    %% TODO: dynamic typechecking    
+    %% TODO: dynamic typechecking
     erl_syntax:case_expr(Ast1, [
         erl_syntax:clause([erl_syntax:atom(true)], none, [Ast2]),
         erl_syntax:clause([erl_syntax:underscore()], none, [Ast3])]);
-ast(Unknown, _, _, _) ->    
+ast(Unknown, _, _, _) ->
     throw({error, lists:concat(["Unknown operator: ", Unknown])}).
 %%====================================================================
 %% Internal functions
