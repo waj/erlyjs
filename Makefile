@@ -4,6 +4,7 @@ compile:
 	rebar compile
 
 clean:
+	rm -rf erl_crash.dump
 	rebar clean
 
 tests: compile

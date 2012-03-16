@@ -269,7 +269,11 @@ ast(return, {Ctx, Trav}) ->
 ast({return, Expression}, {Ctx, Trav}) ->
     ast(Expression, {Ctx, Trav});
 ast({function, {identifier, _L2, Name}, {params, Params, body, Body}}, {Ctx, Trav}) ->
-    func(Name, Params, Body, Ctx, Trav);
+    Body1 = case element(1, lists:last(Body)) of
+    return -> Body;
+    _ -> lists:append(Body, [{return, undefined}])
+    end,
+    func(Name, Params, Body1, Ctx, Trav);
 ast({op, {Op, _}, In}, {Ctx, Trav}) ->
     {Out, _, #trav{var_counter = VarCounter}} = p_t(In, Ctx, Trav),
     {{erlyjs_operators:ast(Op, Out), #ast_inf{}}, {Ctx, Trav#trav{var_counter = VarCounter}}};
@@ -470,6 +474,8 @@ ast({switch, Cond, CaseList, {_, DefaultStmts}}, {Ctx, Trav}) ->
         end, lists:zip(List, StmtsReturnVarsList)),
     Ast = erl_syntax:match_expr(Vars, erl_syntax:case_expr(Cond2, Clauses)),
     {{Ast, #ast_inf{}}, {Ctx, trav_clean(Trav4)}};
+ast(undefined, {Ctx, Trav}) ->
+    {{erl_syntax:atom(undefined), #ast_inf{}}, {Ctx, Trav}};
 ast(Unknown, _) ->
     throw({error, lists:concat(["Unknown token: ", Unknown])}).
 

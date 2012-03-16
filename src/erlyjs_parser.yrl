@@ -328,7 +328,7 @@ VariableInitializer -> '=' AssignmentExpression : '$2'.
 %% Block
 Block -> '{' BlockStatements '}' : '$2'.
 BlockStatements -> Statement : ['$1'].
-BlockStatements ->  BlockStatements  Statement : '$1' ++ ['$2'].
+BlockStatements ->  BlockStatements Statement : '$1' ++ ['$2'].
 
 %% Labeled Statements
 LabeledStatement -> identifier ':' Statement : {label, '$2'}.
@@ -376,7 +376,8 @@ OptionalLabel -> '$empty' : [].
 OptionalLabel -> identifier : '$1'.
 
 %% Return Statement TODO
-ReturnStatement -> return OptionalExpression : {return, '$2'}.
+ReturnStatement -> return : {return, undefined}.
+ReturnStatement -> return Expression : {return, '$2'}.
 
 %% Throw Statement TODO
 ThrowStatement -> throw Expression : '$1'.
@@ -394,7 +395,8 @@ FinallyClause -> finally Block : '$1'.
 FunctionDefinition -> NamedFunction : '$1'.
 AnonymousFunction -> function FormalParametersAndBody : {'$1'}.
 NamedFunction -> function identifier FormalParametersAndBody : {function, '$2', '$3'}.
-FormalParametersAndBody -> '(' FormalParameters ')' Block : { params, '$2', body, '$4'}.
+FormalParametersAndBody -> '(' FormalParameters ')' Block : {params, '$2', body, '$4'}.
+FormalParametersAndBody -> '(' FormalParameters ')' '{' '}' : {params, '$2', body, [{return, undefined}]}.
 FormalParameters -> '$empty' : [].
 FormalParameters -> identifier : ['$1'].
 FormalParameters -> FormalParameters ',' identifier : '$1' ++ ['$3'].
