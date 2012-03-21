@@ -180,7 +180,7 @@ LeftSideExpression -> ShortNewExpression : '$1'.
 CallExpression -> PrimaryExpression : '$1'.
 CallExpression -> FullNewExpression : '$1'.
 CallExpression -> CallExpression MemberOperator : {'$1', list_third_el('$2')}.
-CallExpression -> CallExpression Arguments : {'$1', '$2'}.
+CallExpression -> CallExpression Arguments : funcall('$1', '$2').
 FullNewExpression -> new FullNewSubexpression Arguments : '$1'.
 ShortNewExpression -> new ShortNewSubexpression : '$1'.
 FullNewSubexpression -> PrimaryExpression : '$1'.
@@ -191,8 +191,8 @@ ShortNewSubexpression -> ShortNewExpression : '$1'.
 MemberOperator -> '[' Expression ']' : '$1'.
 MemberOperator -> '.' identifier : ['$2'].
 MemberOperator ->  MemberOperator '.' identifier : '$1' ++ ['$3'].
-Arguments -> '(' ')' : {first_el('$1'), []}.
-Arguments -> '(' ArgumentList ')' : {first_el('$1'), '$2'}.
+Arguments -> '(' ')' : {'(', []}.
+Arguments -> '(' ArgumentList ')' : {'(', '$2'}.
 ArgumentList -> AssignmentExpression : ['$1'].
 ArgumentList -> ArgumentList ',' AssignmentExpression : '$1' ++ ['$3'].
 
@@ -393,7 +393,7 @@ FinallyClause -> finally Block : '$1'.
 
 %% Function Definition
 FunctionDefinition -> NamedFunction : '$1'.
-AnonymousFunction -> function FormalParametersAndBody : {'$1'}.
+AnonymousFunction -> function FormalParametersAndBody : {function, '$2'}.
 NamedFunction -> function identifier FormalParametersAndBody : {function, '$2', '$3'}.
 FormalParametersAndBody -> '(' FormalParameters ')' Block : {params, '$2', body, '$4'}.
 FormalParametersAndBody -> '(' FormalParameters ')' '{' '}' : {params, '$2', body, [{return, undefined}]}.
@@ -413,6 +413,7 @@ Erlang code.
 
 postfix({Op, Line}) -> {Op, postfix, Line}.
 
-first_el({First, _}) -> First.
-
 list_third_el(L) ->  [X || {identifier, _ , X} <- L].
+
+funcall(Call, Args) when size(Call) =:= 3 -> {apply, Call, Args};
+funcall(Call, Args) -> {Call, Args}.

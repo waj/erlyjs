@@ -67,28 +67,28 @@ compile(File, Module, Options) ->
     Ctx = init_js_ctx(File, Module, Options),
     {M, F} = Ctx#js_ctx.reader,
     case catch M:F(File) of
-        {ok, Data} ->
-            crypto:start(),
-            CheckSum = binary_to_list(crypto:sha(Data)),
-            case parse(CheckSum, Data, Ctx) of
-                ok ->
-                    ok;
-                {ok, JsParseTree} ->
-                    trace(?MODULE, ?LINE, "JsParseTree", JsParseTree, Ctx),
-                    try p_t_root(JsParseTree, Ctx, #trav{}) of
-                        {AstList, Info, _} ->
-                            Forms = forms(CheckSum, Module, AstList, Info),
-                            trace(?MODULE, ?LINE, "Forms", Forms, Ctx),
-                            compile_forms(Forms, Ctx)
-                    catch
-                        throw:Error ->
-                            Error
-                    end;
-                Error ->
+    {ok, Data} ->
+        crypto:start(),
+        CheckSum = binary_to_list(crypto:sha(Data)),
+        case parse(CheckSum, Data, Ctx) of
+        ok ->
+            ok;
+        {ok, JsParseTree} ->
+            trace(?MODULE, ?LINE, "JsParseTree", JsParseTree, Ctx),
+            try p_t_root(JsParseTree, Ctx, #trav{}) of
+                {AstList, Info, _} ->
+                    Forms = forms(CheckSum, Module, AstList, Info),
+                    trace(?MODULE, ?LINE, "Forms", Forms, Ctx),
+                    compile_forms(Forms, Ctx)
+            catch
+                throw:Error ->
                     Error
             end;
-        _ ->
-            {error, "reading " ++ File ++ " failed "}
+        Error ->
+            Error
+        end;
+    _ ->
+        {error, "reading " ++ File ++ " failed "}
     end.
 
 
@@ -96,10 +96,8 @@ parse(Data) when is_binary(Data) ->
     parse(binary_to_list(Data));
 parse(Data) ->
     case erlyjs_scan:string(Data) of
-        {ok, Tokens, _} ->
-            erlyjs_parser:parse(Tokens);
-        Err ->
-            Err
+    {ok, Tokens, _} -> erlyjs_parser:parse(Tokens);
+    Err -> Err
     end.
 
 
@@ -126,10 +124,8 @@ parse(_, Data, #js_ctx{force_recompile = true}) ->
 parse(CheckSum, Data, Ctx) ->
     Module = Ctx#js_ctx.module,
     case catch Module:checksum() of
-        CheckSum ->
-            ok;
-        _ ->
-            parse(Data)
+    CheckSum -> ok;
+    _ -> parse(Data)
     end.
 
 
@@ -137,11 +133,11 @@ forms(Checksum, Module, FuncAsts, Info) ->
     FuncAsts2 = lists:append([FuncAsts, Info#ast_inf.internal_func_asts]),
 
     InitFuncAstBody = case Info#ast_inf.global_asts of
-        [] ->
-            [erl_syntax:tuple([erl_syntax:atom("error"),
-                erl_syntax:atom("no_global_code")])];
-        List ->
-            lists:reverse([erl_syntax:atom(ok) | List])
+    [] ->
+        [erl_syntax:tuple([erl_syntax:atom("error"),
+            erl_syntax:atom("no_global_code")])];
+    List ->
+        lists:reverse([erl_syntax:atom(ok) | List])
     end,
     InitFuncAst = erl_syntax:function(erl_syntax:atom("jsinit"),
         [erl_syntax:clause([], none, InitFuncAstBody)]),
@@ -183,31 +179,32 @@ forms(Checksum, Module, FuncAsts, Info) ->
 
 compile_forms(Forms, Ctx) ->
     CompileOptions = case Ctx#js_ctx.verbose of
-        true -> [debug_info, verbose, report_errors, report_warnings];
-        _ -> [debug_info]
+    true -> [debug_info, verbose, report_errors, report_warnings];
+    _ -> [debug_info]
     end,
     case compile:forms(Forms, CompileOptions) of
-        {ok, Module1, Bin} ->
-            case Ctx#js_ctx.verbose of
-                true ->
-                    io:format("Erlang source:~n~n"),
-                    io:put_chars(erl_prettypr:format(erl_syntax:form_list(Forms))),
-                    io:format("~n");
-                _ -> ok
-            end,
-            Path = filename:join([Ctx#js_ctx.out_dir, atom_to_list(Module1) ++ ".beam"]),
-            case file:write_file(Path, Bin) of
-                ok ->
-                    code:purge(Module1),
-                    case code:load_binary(Module1, atom_to_list(Module1) ++ ".erl", Bin) of
-                        {module, _} -> ok;
-                        _ -> {error, "code reload failed"}
-                    end;
-                {error, Reason} ->
-                    {error, lists:concat(["beam generation failed (", Reason, "): ", Path])}
+    {ok, Module1, Bin} ->
+        case Ctx#js_ctx.verbose of
+        true ->
+            io:format("Erlang source:~n~n"),
+            io:put_chars(erl_prettypr:format(erl_syntax:form_list(Forms))),
+            io:format("~n");
+        _ ->
+            ok
+        end,
+        Path = filename:join([Ctx#js_ctx.out_dir, atom_to_list(Module1) ++ ".beam"]),
+        case file:write_file(Path, Bin) of
+        ok ->
+            code:purge(Module1),
+            case code:load_binary(Module1, atom_to_list(Module1) ++ ".erl", Bin) of
+            {module, _} -> ok;
+            _ -> {error, "code reload failed"}
             end;
-        error ->
-            {error, "compilation failed"}
+        {error, Reason} ->
+            {error, lists:concat(["beam generation failed (", Reason, "): ", Path])}
+        end;
+    error ->
+        {error, "compilation failed"}
     end.
 
 
@@ -252,12 +249,16 @@ ast({{identifier, _, 'NaN'}, _}, {Ctx, Trav}) ->
     {{erl_syntax:atom('NaN'), #ast_inf{}}, {Ctx, Trav}};
 ast({identifier, _, Name}, {Ctx, Trav}) ->
     var_ast(Name, Ctx, Trav);
-ast({{identifier, _, Name} , {'(', Args}}, {Ctx, Trav}) ->
-    call(Name, [], Args, Ctx, Trav);
 ast({{{string, _, String}, Names}, {'(', Args}}, {Ctx, Trav}) ->
     call(string, String, Names, Args, Ctx, Trav);
 ast({{{identifier, _, Name}, Names}, {'(', Args}}, {Ctx, Trav}) ->
     call(Name, Names, Args, Ctx, Trav);
+ast({apply, {identifier, _, Name} , {'(', Args}}, {Ctx, Trav}) ->
+    call(Name, [], Args, Ctx, Trav);
+ast({apply, Call, {'(', Args}}, {Ctx, Trav}) ->
+    {{Ast, Inf}, {Ctx1, Trav1}} = ast(Call, {Ctx#js_ctx{action = get}, Trav}),
+    {Args1, _, _} = p_t(Args, Ctx1, Trav1),
+    {{erl_syntax:application(none, Ast, Args1), Inf}, {Ctx1, Trav1}};
 ast({{identifier, _, Name}, Value}, {Ctx, Trav}) ->
     var_declare(Name, Value, Ctx, Trav);
 ast({var, DeclarationList}, {Ctx, Trav}) ->
@@ -268,6 +269,12 @@ ast(return, {Ctx, Trav}) ->
     empty_ast(Ctx, Trav);
 ast({return, Expression}, {Ctx, Trav}) ->
     ast(Expression, {Ctx, Trav});
+ast({function, {params, Params, body, Body}}, {Ctx, Trav}) ->
+    Body1 = case element(1, lists:last(Body)) of
+    return -> Body;
+    _ -> lists:append(Body, [{return, undefined}])
+    end,
+    func(Params, Body1, Ctx, Trav);
 ast({function, {identifier, _L2, Name}, {params, Params, body, Body}}, {Ctx, Trav}) ->
     Body1 = case element(1, lists:last(Body)) of
     return -> Body;
@@ -494,10 +501,8 @@ var_ast(Key, #js_ctx{action = set} = Ctx, Trav) ->
     {ErlName, Trav2} = build_var_name(Key, Trav),
     Dict = dict:store(Key, ErlName, Scope#scope.names_dict),
     Names = case Trav2#trav.names of
-        [] ->
-            [];
-        Val ->
-            [dict:store(Key, ErlName, hd(Val)) | tl(Val)]
+    [] -> [];
+    [H|T] -> [dict:store(Key, ErlName, H) | T]
     end,
     Trav3 = Trav2#trav{
         js_scopes = [#scope{names_dict = Dict} | tl(Trav#trav.js_scopes)],
@@ -512,14 +517,14 @@ var_ast('NaN', #js_ctx{action = get} = Ctx, Trav) ->
     {{erl_syntax:atom('NaN'), #ast_inf{}}, {Ctx, Trav}};
 var_ast(Key, #js_ctx{action = get} = Ctx, Trav) ->
     case name_search(Key, Trav#trav.js_scopes, []) of
-        not_found ->
-            throw({error, lists:concat(["ReferenceError: ", Key, " is not defined"])});
-        {global, Name} ->
-            Args = [erl_syntax:atom(Name)],
-            Ast = erl_syntax:application(none, erl_syntax:atom(get), Args),
-            {{Ast, #ast_inf{}}, {Ctx, Trav}};
-        Name ->
-            {{erl_syntax:variable(Name), #ast_inf{}}, {Ctx, Trav}}
+    not_found ->
+        throw({error, lists:concat(["ReferenceError: ", Key, " is not defined"])});
+    {global, Name} ->
+        Args = [erl_syntax:atom(Name)],
+        Ast = erl_syntax:application(none, erl_syntax:atom(get), Args),
+        {{Ast, #ast_inf{}}, {Ctx, Trav}};
+    Name ->
+        {{erl_syntax:variable(Name), #ast_inf{}}, {Ctx, Trav}}
     end.
 
 var_declare(Key, [], Ctx, #trav{js_scopes = [GlobalScope]}=Trav) ->
@@ -574,13 +579,13 @@ name_search(_, [], _) ->
     not_found;
 name_search(Key, [H | T], Trav) ->
     case dict:find(Key, H#scope.names_dict) of
-        {ok, Value} ->
-            case T of
-                [] ->
-                    {global, global_prefix(Key)};
-                _ -> Value
-            end;
-        error -> name_search(Key, T, [H | Trav])
+    {ok, Value} ->
+        case T of
+        [] -> {global, global_prefix(Key)};
+        _ -> Value
+        end;
+    error ->
+        name_search(Key, T, [H | Trav])
     end.
 
 
@@ -661,31 +666,31 @@ get_switch_clause_list(CaseList, Trav, Ctx) ->
             ({[LabelIn], StmtsIn}, AccTravIn) ->
                 AccTravIn2 = trav_reset(AccTravIn),
                 case lists:last(StmtsIn) of
-                    {break, _} ->
-                        StmtsIn2 = lists:reverse(tl(lists:reverse(StmtsIn))),
-                        {LabelOut, _, _} = p_t(LabelIn, Ctx, AccTravIn2),
-                        {StmtsOut, _, AccTravOut} = p_t(StmtsIn2, Ctx, AccTravIn2),
-                        Names = dict:to_list(hd(AccTravOut#trav.names)),
-                        {{LabelOut, none, StmtsOut, Names, AccTravOut}, AccTravOut};
-                     _ ->
-                         exit(not_implemented_yet)
+                {break, _} ->
+                    StmtsIn2 = lists:reverse(tl(lists:reverse(StmtsIn))),
+                    {LabelOut, _, _} = p_t(LabelIn, Ctx, AccTravIn2),
+                    {StmtsOut, _, AccTravOut} = p_t(StmtsIn2, Ctx, AccTravIn2),
+                    Names = dict:to_list(hd(AccTravOut#trav.names)),
+                    {{LabelOut, none, StmtsOut, Names, AccTravOut}, AccTravOut};
+                 _ ->
+                     exit(not_implemented_yet)
                 end;
             ({LabelsIn, StmtsIn}, AccTravIn) ->
                 AccTravIn2 = trav_reset(AccTravIn),
                 case lists:last(StmtsIn) of
-                    {break, _} ->
-                        StmtsIn2 = lists:reverse(tl(lists:reverse(StmtsIn))),
-                        {LabelsOut, _, _} = p_t(LabelsIn, Ctx, AccTravIn2),
-                        Guards = erl_syntax:disjunction(lists:map(
-                            fun(Label) ->
-                                Ast = erl_syntax:variable("X"),
-                                erl_syntax:infix_expr(Ast, erl_syntax:operator('=='), Label)
-                            end, LabelsOut)),
-                        {StmtsOut, _, AccTravOut} = p_t(StmtsIn2, Ctx, AccTravIn2),
-                        Names = dict:to_list(hd(AccTravOut#trav.names)),
-                        {{erl_syntax:variable("X"), Guards, StmtsOut, Names, AccTravOut}, AccTravOut};
-                     _ ->
-                         exit(not_implemented_yet)
+                {break, _} ->
+                    StmtsIn2 = lists:reverse(tl(lists:reverse(StmtsIn))),
+                    {LabelsOut, _, _} = p_t(LabelsIn, Ctx, AccTravIn2),
+                    Guards = erl_syntax:disjunction(lists:map(
+                        fun(Label) ->
+                            Ast = erl_syntax:variable("X"),
+                            erl_syntax:infix_expr(Ast, erl_syntax:operator('=='), Label)
+                        end, LabelsOut)),
+                    {StmtsOut, _, AccTravOut} = p_t(StmtsIn2, Ctx, AccTravIn2),
+                    Names = dict:to_list(hd(AccTravOut#trav.names)),
+                    {{erl_syntax:variable("X"), Guards, StmtsOut, Names, AccTravOut}, AccTravOut};
+                 _ ->
+                     exit(not_implemented_yet)
                 end
         end, Trav, CaseList).
 
@@ -700,43 +705,53 @@ sort_vars(Vars) ->
         end, Vars).
 
 
+func(Params, Body, Ctx, Trav) ->
+    {Params1, _, Trav1} = p_t(Params, Ctx#js_ctx{action = set}, Trav),
+    {Ast, Inf, _} = p_t(Body, Ctx#js_ctx{action = get}, wrap_add_scope(Trav1)),
+    Ast1 = erl_syntax:fun_expr([erl_syntax:clause(Params1, none, Ast)]),
+    {{Ast1, Inf}, {Ctx, Trav1}}.
+
 func(Name, Params, Body, Ctx, Trav) ->
-    {Params1, _, _} = p_t(Params, Ctx, Trav),
-    {Ast, Inf, _} = p_t(Body, Ctx, wrap_add_scope(Trav)),
-    Ast1 = erl_syntax:function(erl_syntax:atom(global_prefix(Name)),
-        [erl_syntax:clause(Params1, none, Ast)]),
+    {Params1, _, Trav1} = p_t(Params, Ctx#js_ctx{action = set}, Trav),
+    {Ast, Inf, _} = p_t(Body, Ctx#js_ctx{action = get}, wrap_add_scope(Trav1)),
     case Ctx#js_ctx.global of
-        true->
-            Export = erl_syntax:arity_qualifier(erl_syntax:atom(global_prefix(Name)),
-                erl_syntax:integer(length(Params))),
-            Exports = [Export | Inf#ast_inf.export_asts],
-            {{Ast1, Inf#ast_inf{export_asts = Exports}}, {Ctx, Trav}};
-        _ ->
-            {{Ast1, Inf}, {Ctx, Trav}}
+    true->
+        Ast1 = erl_syntax:function(erl_syntax:atom(global_prefix(Name)),
+            [erl_syntax:clause(Params1, none, Ast)]),
+        Export = erl_syntax:arity_qualifier(erl_syntax:atom(global_prefix(Name)),
+            erl_syntax:integer(length(Params))),
+        Exports = [Export | Inf#ast_inf.export_asts],
+        {{Ast1, Inf#ast_inf{export_asts = Exports}}, {Ctx, Trav1}};
+    _ ->
+        {{FunVar, _}, {_, Trav2}} = var_ast(Name, Ctx#js_ctx{action = set}, Trav1),
+        Ast1 = erl_syntax:fun_expr([erl_syntax:clause(Params1, none, Ast)]),
+        {{erl_syntax:match_expr(FunVar, Ast1), Inf}, {Ctx, Trav2}}
     end.
 
 
 call(string, String, DotSepNames, Args, Ctx, Trav) ->
     Arity = length(Args),
     case get_mod_func(String, DotSepNames, Arity) of
-        {Mod, Func, _} ->
-            call2(Mod, Func, erl_syntax:string(String), Args, Ctx, Trav);
-        _ ->
-            throw({error, lists:concat(["No such function: ",
-                pprint_name("String", DotSepNames, Arity)])})
+    {Mod, Func, _} ->
+        call2(Mod, Func, erl_syntax:string(String), Args, Ctx, Trav);
+    _ ->
+        throw({error, lists:concat(["No such function: ",
+            pprint_name("String", DotSepNames, Arity)])})
     end.
 
 call(Name, DotSepNames, Args, Ctx, Trav) ->
     Arity = length(Args),
     case get_mod_func(Name, DotSepNames, Arity) of
-        {Mod, Func} ->
-            call2(Mod, Func, Args, Ctx, Trav);
-        {Mod, Func, Arg} ->
-            {{VarArg, _}, _} = var_ast(Arg, Ctx, Trav),
-            call2(Mod, Func, VarArg, Args, Ctx, Trav);
-        _ ->
-            throw({error, lists:concat(["No such function: ",
-                pprint_name(Name, DotSepNames, Arity)])})
+    {Mod, Func} ->
+        call2(Mod, Func, Args, Ctx, Trav);
+    {Mod, Func, Arg} ->
+        {{VarArg, _}, _} = var_ast(Arg, Ctx#js_ctx{action = get}, Trav),
+        call2(Mod, Func, VarArg, Args, Ctx, Trav);
+    _ ->
+        {{VarAst, _}, _} = var_ast(Name, Ctx#js_ctx{action = get}, Trav),
+        {Args1, _, Trav1} = p_t(Args, Ctx, Trav),
+        Ast = erl_syntax:application(none, VarAst, Args1),
+        maybe_global({{Ast, #ast_inf{}}, {Ctx, Trav1}})
     end.
 
 call2(Mod, Func, Args, Ctx, Trav) ->
@@ -909,8 +924,6 @@ pprint_name(_, DotSepNames, Arity)  ->
 
 trace(Module, Line, Title, Content, Ctx) ->
     case Ctx#js_ctx.verbose of
-        true ->
-            io:format("TRACE ~p:~p ~p: ~p~n",[Module, Line, Title, Content]);
-        _ ->
-            ok
+    true -> io:format("TRACE ~p:~p ~p: ~p~n",[Module, Line, Title, Content]);
+    _ -> ok
     end.
