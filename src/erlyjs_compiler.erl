@@ -258,7 +258,7 @@ ast({apply, {identifier, _, Name} , {'(', Args}}, {Ctx, Trav}) ->
 ast({apply, Call, {'(', Args}}, {Ctx, Trav}) ->
     {{Ast, Inf}, {Ctx1, Trav1}} = ast(Call, {Ctx#js_ctx{action = get}, Trav}),
     {Args1, _, _} = p_t(Args, Ctx1, Trav1),
-    {{erl_syntax:application(none, Ast, Args1), Inf}, {Ctx1, Trav1}};
+    {{erl_syntax:application(none, Ast, [erl_syntax:list(Args1)]), Inf}, {Ctx1, Trav1}};
 ast({{identifier, _, Name}, Value}, {Ctx, Trav}) ->
     var_declare(Name, Value, Ctx, Trav);
 ast({var, DeclarationList}, {Ctx, Trav}) ->
@@ -706,27 +706,68 @@ sort_vars(Vars) ->
 
 
 func(Params, Body, Ctx, Trav) ->
-    {Params1, _, Trav1} = p_t(Params, Ctx#js_ctx{action = set}, Trav),
-    {Ast, Inf, _} = p_t(Body, Ctx#js_ctx{action = get}, wrap_add_scope(Trav1)),
-    Ast1 = erl_syntax:fun_expr([erl_syntax:clause(Params1, none, Ast)]),
-    {{Ast1, Inf}, {Ctx, Trav1}}.
+    {ArgsVar, ArgsAst, Trav1} = arguments_p_t(Params, Ctx, Trav),
+    {BodyAst, Inf, _} = p_t(Body, Ctx#js_ctx{action = get}, wrap_add_scope(Trav1)),
+    Ast = erl_syntax:fun_expr([erl_syntax:clause([ArgsVar], none, append_asts(ArgsAst, BodyAst))]),
+    {{Ast, Inf}, {Ctx, Trav1}}.
 
 func(Name, Params, Body, Ctx, Trav) ->
-    {Params1, _, Trav1} = p_t(Params, Ctx#js_ctx{action = set}, Trav),
-    {Ast, Inf, _} = p_t(Body, Ctx#js_ctx{action = get}, wrap_add_scope(Trav1)),
     case Ctx#js_ctx.global of
     true->
-        Ast1 = erl_syntax:function(erl_syntax:atom(global_prefix(Name)),
-            [erl_syntax:clause(Params1, none, Ast)]),
-        Export = erl_syntax:arity_qualifier(erl_syntax:atom(global_prefix(Name)),
-            erl_syntax:integer(length(Params))),
+        {ArgsVar, ArgsAst, Trav1} = arguments_p_t(Params, Ctx, Trav),
+
+        {BodyAst, Inf, _} = p_t(Body, Ctx#js_ctx{action = get}, wrap_add_scope(Trav1)),
+        Ast = erl_syntax:function(erl_syntax:atom(global_prefix(Name)),
+                  [erl_syntax:clause([ArgsVar], none, append_asts(ArgsAst, BodyAst))]),
+        Export = erl_syntax:arity_qualifier(
+                     erl_syntax:atom(global_prefix(Name)),
+                     erl_syntax:integer(1)),
         Exports = [Export | Inf#ast_inf.export_asts],
-        {{Ast1, Inf#ast_inf{export_asts = Exports}}, {Ctx, Trav1}};
+        {{Ast, Inf#ast_inf{export_asts = Exports}}, {Ctx, Trav1}};
+
     _ ->
-        {{FunVar, _}, {_, Trav2}} = var_ast(Name, Ctx#js_ctx{action = set}, Trav1),
-        Ast1 = erl_syntax:fun_expr([erl_syntax:clause(Params1, none, Ast)]),
-        {{erl_syntax:match_expr(FunVar, Ast1), Inf}, {Ctx, Trav2}}
+        {{FunVar, _}, {_, Trav1}} = var_ast(Name, Ctx#js_ctx{action = set}, Trav),
+        {ArgsVar, ArgsAst, Trav2} = arguments_p_t(Params, Ctx, Trav1),
+        {BodyAst, Inf, _} = p_t(Body, Ctx#js_ctx{action = get}, wrap_add_scope(Trav2)),
+        Ast = erl_syntax:fun_expr([erl_syntax:clause([ArgsVar], none, append_asts(ArgsAst, BodyAst))]),
+        {{erl_syntax:match_expr(FunVar, Ast), Inf}, {Ctx, Trav2}}
     end.
+
+arguments_p_t([], Ctx, Trav) ->
+    {{Args, _}, {_, Trav1}} = var_ast(arguments, Ctx#js_ctx{action = set}, Trav),
+    {Args, [], Trav1};
+arguments_p_t(Params, Ctx, Trav) ->
+    {{Args, _}, {_, Trav1}} = var_ast(arguments, Ctx#js_ctx{action = set}, Trav),
+    {VarName, Trav2} = build_var_name("arguments_length", Trav1),
+    ArgsLen = erl_syntax:variable(VarName),
+    {Params1, _, Trav3} = p_t(Params, Ctx#js_ctx{action = set}, Trav2),
+    Clauses = lists:map(
+        fun(I) ->
+            Guard = erl_syntax:infix_expr(
+                        ArgsLen,
+                        erl_syntax:operator('>='),
+                        erl_syntax:integer(I)),
+            ArgVals = lists:map(
+                fun(J)  ->
+                    case J =< I of
+                    true ->
+                        erl_syntax:application(
+                            erl_syntax:atom(lists),
+                            erl_syntax:atom(nth),
+                            [erl_syntax:integer(J), Args]);
+                    false ->
+                        erl_syntax:atom(undefined)
+                    end
+                end, lists:seq(1, length(Params1))),
+            Body = erl_syntax:match_expr(
+                       erl_syntax:list(Params1),
+                       erl_syntax:list(ArgVals)),
+            erl_syntax:clause([ArgsLen], Guard, [Body])
+        end, lists:seq(length(Params1), 0, -1)),
+    AstList = erl_syntax:case_expr(
+                  erl_syntax:application(none, erl_syntax:atom(length), [Args]),
+                  Clauses),
+    {Args, AstList, Trav3}.
 
 
 call(string, String, DotSepNames, Args, Ctx, Trav) ->
@@ -745,12 +786,12 @@ call(Name, DotSepNames, Args, Ctx, Trav) ->
     {Mod, Func} ->
         call2(Mod, Func, Args, Ctx, Trav);
     {Mod, Func, Arg} ->
-        {{VarArg, _}, _} = var_ast(Arg, Ctx#js_ctx{action = get}, Trav),
-        call2(Mod, Func, VarArg, Args, Ctx, Trav);
+        {{VarArgs, _}, _} = var_ast(Arg, Ctx#js_ctx{action = get}, Trav),
+        call2(Mod, Func, VarArgs, Args, Ctx, Trav);
     _ ->
-        {{VarAst, _}, _} = var_ast(Name, Ctx#js_ctx{action = get}, Trav),
+        {{VarArgs, _}, _} = var_ast(Name, Ctx#js_ctx{action = get}, Trav),
         {Args1, _, Trav1} = p_t(Args, Ctx, Trav),
-        Ast = erl_syntax:application(none, VarAst, Args1),
+        Ast = erl_syntax:application(none, VarArgs, [erl_syntax:list(Args1)]),
         maybe_global({{Ast, #ast_inf{}}, {Ctx, Trav1}})
     end.
 

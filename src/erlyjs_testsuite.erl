@@ -87,35 +87,35 @@ run2(Dir) ->
                    end.
 
 
-recreate_scanner_parser() ->
-    crypto:start(),
-    case recreate(erlyjs:scanner_src(),  scanner) of
-        ok ->
-            recreate(erlyjs:parser_src(), parser);
-        Err ->
-            Err
-    end.
-
-
-recreate(File, What) ->
-    Func = list_to_atom(lists:concat(['create_', What])),
-    case file:read_file(File) of
-        {ok, Data} ->
-            CheckSum = binary_to_list(crypto:sha(Data)),
-            Key = list_to_atom(lists:concat([erlyjs, Func, '_checksum'])),
-            case get(Key) of
-                CheckSum ->
-                    ok;
-                _ ->
-                    erlyjs:Func(),
-                    put(Key, CheckSum),
-                    io:format("Recompiling: ~p ...~n",[What]),
-                    ok
-            end;
-        _ ->
-            erlyjs:Func(),
-            recreate(File, What)
-    end.
+%recreate_scanner_parser() ->
+%    crypto:start(),
+%    case recreate(erlyjs:scanner_src(),  scanner) of
+%        ok ->
+%            recreate(erlyjs:parser_src(), parser);
+%        Err ->
+%            Err
+%    end.
+%
+%
+%recreate(File, What) ->
+%    Func = list_to_atom(lists:concat(['create_', What])),
+%    case file:read_file(File) of
+%        {ok, Data} ->
+%            CheckSum = binary_to_list(crypto:sha(Data)),
+%            Key = list_to_atom(lists:concat([erlyjs, Func, '_checksum'])),
+%            case get(Key) of
+%                CheckSum ->
+%                    ok;
+%                _ ->
+%                    erlyjs:Func(),
+%                    put(Key, CheckSum),
+%                    io:format("Recompiling: ~p ...~n",[What]),
+%                    ok
+%            end;
+%        _ ->
+%            erlyjs:Func(),
+%            recreate(File, What)
+%    end.
 
 
 fold_tests(RegExp, Verbose, Dir) ->
@@ -138,10 +138,10 @@ test(File, Verbose) ->
     case erlyjs_compiler:compile(File, Module, Options) of
         ok ->
             M = list_to_atom(Module),
-            Expected = M:js_test_ok(),
-            Args = M:js_test_args(),
+            Expected = M:js_test_ok([]),
+            Args = M:js_test_args([]),
             M:jsinit(),
-            Result = case catch apply(M, js_test, Args) of
+            Result = case catch apply(M, js_test, [Args]) of
                          Expected ->
                              io:format("ok ~n"),
                              ok;
