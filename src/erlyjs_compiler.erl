@@ -264,9 +264,6 @@ ast({{identifier, _, Name}, Value}, {Ctx, Trav}) ->
 ast({var, DeclarationList}, {Ctx, Trav}) ->
     {Ast, Inf, Trav1} = p_t(DeclarationList, Ctx#js_ctx{action = set}, Trav),
     maybe_global({{Ast, Inf}, {Ctx, Trav1}});
-ast(return, {Ctx, Trav}) ->
-    %% TODO: implement 'throw' to make this work
-    empty_ast(Ctx, Trav);
 ast({return, Expression}, {Ctx, Trav}) ->
     ast(Expression, {Ctx, Trav});
 ast({function, {params, Params, body, Body}}, {Ctx, Trav}) ->
@@ -485,11 +482,6 @@ ast(undefined, {Ctx, Trav}) ->
     {{erl_syntax:atom(undefined), #ast_inf{}}, {Ctx, Trav}};
 ast(Unknown, _) ->
     throw({error, lists:concat(["Unknown token: ", Unknown])}).
-
-
-empty_ast(Ctx, Trav) ->
-    io:format("TRACE ~p:~p ~p~n",[?MODULE, ?LINE, "empty_ast might currently cause exit"]),
-    {{[], #ast_inf{}}, {Ctx, Trav}}.
 
 
 func_name(Trav) ->
