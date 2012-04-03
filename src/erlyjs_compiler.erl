@@ -259,6 +259,9 @@ ast({apply, Call, {'(', Args}}, {Ctx, Trav}) ->
     {{Ast, Inf}, {Ctx1, Trav1}} = ast(Call, {Ctx#js_ctx{action = get}, Trav}),
     {Args1, _, _} = p_t(Args, Ctx1, Trav1),
     {{erl_syntax:application(none, Ast, [erl_syntax:list(Args1)]), Inf}, {Ctx1, Trav1}};
+ast({{identifier, _, Name}, [length]}, {Ctx, Trav}) ->
+    {{Var, Inf}, _} = var_ast(Name, Ctx, Trav),
+    {{erl_syntax:application(none, erl_syntax:atom(length), [Var]), Inf}, {Ctx, Trav}};
 ast({{identifier, _, Name}, Value}, {Ctx, Trav}) ->
     var_declare(Name, Value, Ctx, Trav);
 ast({var, DeclarationList}, {Ctx, Trav}) ->
