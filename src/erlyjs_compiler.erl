@@ -51,11 +51,11 @@
     internal_func_asts = []}).  %%  Internal Erlang functions
 
 -record(scope, {                %%  represents a Javascript variable scope
-    names_dict = dict:new()}).  %%  Key: JsName, Value: ErlName
+    var_dict = dict:new()}).    %%  Key: JsName, Value: {ErlName, Metadata}
 
 -record(trav, {                 %%  traverses the whole tree
     js_scopes = [#scope{}],     %%  for Javascript variables scopes
-    names = [],                 %%  for temporary use: [{JsNameAsKey, ErlName}, ...]
+    names = [],                 %%  for temporary use: [{JsNameAsKey, {ErlName, Metadata}}, ...]
     var_counter = 0,            %%  for unique Erlang variable names
     func_counter = 0}).         %%  for unique internal Erlang function names
 
@@ -260,8 +260,16 @@ ast({apply, Call, {'(', Args}}, {Ctx, Trav}) ->
     {Args1, _, _} = p_t(Args, Ctx1, Trav1),
     {{erl_syntax:application(none, Ast, [erl_syntax:list(Args1)]), Inf}, {Ctx1, Trav1}};
 ast({{identifier, _, Name}, [length]}, {Ctx, Trav}) ->
-    {{Var, Inf}, _} = var_ast(Name, Ctx, Trav),
-    {{erl_syntax:application(none, erl_syntax:atom(length), [Var]), Inf}, {Ctx, Trav}};
+    {{{_Var, Metadata}, Inf}, _} = var_ast(Name, Ctx#js_ctx{action = get_all}, Trav),
+    case Metadata of
+    {_, Props} ->
+        case proplists:get_value(length, Props) of
+        undefined -> {{erl_syntax:atom(undefined), Inf}, {Ctx, Trav}};
+        Length -> {{Length, Inf}, {Ctx, Trav}}
+        end;
+    _ ->
+        {{erl_syntax:atom(undefined), Inf}, {Ctx, Trav}}
+    end;
 ast({{identifier, _, Name}, Value}, {Ctx, Trav}) ->
     var_declare(Name, Value, Ctx, Trav);
 ast({var, DeclarationList}, {Ctx, Trav}) ->
@@ -491,19 +499,22 @@ func_name(Trav) ->
     erl_syntax:atom(lists:concat(["func_", Trav#trav.func_counter])).
 
 
-var_ast(Key, #js_ctx{action = set} = Ctx, Trav) ->
+
+var_ast(Key, #js_ctx{action = set} = Ctx, Metadata, Trav) ->
     Scope = hd(Trav#trav.js_scopes),
     {ErlName, Trav2} = build_var_name(Key, Trav),
-    Dict = dict:store(Key, ErlName, Scope#scope.names_dict),
+    Dict = dict:store(Key, {ErlName, Metadata}, Scope#scope.var_dict),
     Names = case Trav2#trav.names of
     [] -> [];
-    [H|T] -> [dict:store(Key, ErlName, H) | T]
+    [H|T] -> [dict:store(Key, {ErlName, Metadata}, H) | T]
     end,
     Trav3 = Trav2#trav{
-        js_scopes = [#scope{names_dict = Dict} | tl(Trav#trav.js_scopes)],
+        js_scopes = [#scope{var_dict = Dict} | tl(Trav#trav.js_scopes)],
         names = Names},
-    {{erl_syntax:variable(ErlName), #ast_inf{}}, {Ctx, Trav3}};
+    {{erl_syntax:variable(ErlName), #ast_inf{}}, {Ctx, Trav3}}.
 
+var_ast(Key, #js_ctx{action = set} = Ctx, Trav) ->
+    var_ast(Key, #js_ctx{action = set} = Ctx, {}, Trav);
 var_ast(undefined, #js_ctx{action = get} = Ctx, Trav) ->
     {{erl_syntax:atom(undefined), #ast_inf{}}, {Ctx, Trav}};
 var_ast('Infinity', #js_ctx{action = get} = Ctx, Trav) ->
@@ -511,24 +522,27 @@ var_ast('Infinity', #js_ctx{action = get} = Ctx, Trav) ->
 var_ast('NaN', #js_ctx{action = get} = Ctx, Trav) ->
     {{erl_syntax:atom('NaN'), #ast_inf{}}, {Ctx, Trav}};
 var_ast(Key, #js_ctx{action = get} = Ctx, Trav) ->
+    {{{Ast, _}, Inf}, _} = var_ast(Key, Ctx#js_ctx{action = get_all}, Trav),
+    {{Ast, Inf}, {Ctx, Trav}};
+var_ast(Key, #js_ctx{action = get_all} = Ctx, Trav) ->
     case name_search(Key, Trav#trav.js_scopes, []) of
     not_found ->
         throw({error, lists:concat(["ReferenceError: ", Key, " is not defined"])});
-    {global, Name} ->
+    {global, {Name, Metadata}} ->
         Args = [erl_syntax:atom(Name)],
         Ast = erl_syntax:application(none, erl_syntax:atom(get), Args),
-        {{Ast, #ast_inf{}}, {Ctx, Trav}};
-    Name ->
-        {{erl_syntax:variable(Name), #ast_inf{}}, {Ctx, Trav}}
+        {{{Ast, Metadata}, #ast_inf{}}, {Ctx, Trav}};
+    {Name, Metadata} ->
+        {{{erl_syntax:variable(Name), Metadata}, #ast_inf{}}, {Ctx, Trav}}
     end.
 
 var_declare(Key, [], Ctx, #trav{js_scopes = [GlobalScope]}=Trav) ->
-    Dict = dict:store(Key, global_prefix(Key), GlobalScope#scope.names_dict),
+    Dict = dict:store(Key, {global_prefix(Key), []}, GlobalScope#scope.var_dict),
     Args = [erl_syntax:atom(global_prefix(Key)), erl_syntax:atom(undefined)],
     Ast = erl_syntax:application(none, erl_syntax:atom(put), Args),
-    Trav2 = Trav#trav{js_scopes=[#scope{names_dict = Dict}]},
+    Trav2 = Trav#trav{js_scopes=[#scope{var_dict = Dict}]},
     {{Ast,  #ast_inf{}}, {Ctx, Trav2}};
-var_declare(Key, {identifier, _, undefined}, Ctx,  #trav{js_scopes = [_]}=Trav) ->
+var_declare(Key, {identifier, _, undefined}, Ctx, #trav{js_scopes = [_]}=Trav) ->
     {_, {_, Trav2}}  = var_ast(Key, Ctx, Trav),
     Args = [erl_syntax:atom(global_prefix(Key)), erl_syntax:atom(undefined)],
     Ast = erl_syntax:application(none, erl_syntax:atom(put), Args),
@@ -544,8 +558,8 @@ var_declare(Key, {identifier, _, 'NaN'}, Ctx,  #trav{js_scopes = [_]}=Trav) ->
     Ast = erl_syntax:application(none, erl_syntax:atom(put), Args),
     {{Ast,  #ast_inf{}}, {Ctx, Trav2}};
 var_declare(Key, Value, Ctx,  #trav{js_scopes = [GlobalScope]}=Trav) ->
-    Dict = dict:store(Key, global_prefix(Key), GlobalScope#scope.names_dict),
-    Trav2 = Trav#trav{js_scopes=[#scope{names_dict = Dict}]},
+    Dict = dict:store(Key, {global_prefix(Key), []}, GlobalScope#scope.var_dict),
+    Trav2 = Trav#trav{js_scopes=[#scope{var_dict = Dict}]},
     {ValueAst, Inf, Trav3} = parse_transform(Value, Ctx, Trav2),
     Args = [erl_syntax:atom(global_prefix(Key)), ValueAst],
     Ast = erl_syntax:application(none, erl_syntax:atom(put), Args),
@@ -573,11 +587,11 @@ var_declare(Key, Value, Ctx, Trav) ->
 name_search(_, [], _) ->
     not_found;
 name_search(Key, [H | T], Trav) ->
-    case dict:find(Key, H#scope.names_dict) of
-    {ok, Value} ->
+    case dict:find(Key, H#scope.var_dict) of
+    {ok, {ErlName, Metadata}} ->
         case T of
-        [] -> {global, global_prefix(Key)};
-        _ -> Value
+        [] -> {global, {global_prefix(Key), Metadata}};
+        _ -> {ErlName, Metadata}
         end;
     error ->
         name_search(Key, T, [H | Trav])
@@ -608,7 +622,7 @@ get_vars_init(Trav1, Trav2, Ctx) ->
 
 get_vars_snapshot(Trav) ->
     erl_syntax:tuple(sort_vars(dict:fold(
-        fun(_, Val, AccTravIn) ->
+        fun(_, {Val, _Metadata}, AccTravIn) ->
             [erl_syntax:variable(Val) | AccTravIn]
         end, [], hd(Trav#trav.names)))).
 
@@ -619,7 +633,7 @@ get_vars_list(NameKeys, TravList, Trav, Ctx) ->
           erl_syntax:tuple(lists:map(
               fun(Key) ->
                   case dict:find(Key, hd(X#trav.names)) of
-                  {ok, Val} ->
+                  {ok, {Val, _Metadata}} ->
                      erl_syntax:variable(Val);
                   error ->
                      {{Ast, _}, {_, _}} = var_ast(Key, Ctx, Trav),
@@ -721,7 +735,7 @@ func(Name, Params, Body, Ctx, Trav) ->
         {{Ast, Inf#ast_inf{export_asts = Exports}}, {Ctx, Trav1}};
 
     _ ->
-        {{FunVar, _}, {_, Trav1}} = var_ast(Name, Ctx#js_ctx{action = set}, Trav),
+        {{FunVar, _}, {_, Trav1}} = var_ast(Name, Ctx#js_ctx{action = set}, {function, [{length, erl_syntax:integer(length(Params))}]}, Trav),
         {ArgsVar, ArgsAst, Trav2} = arguments_p_t(Params, Ctx, Trav1),
         {BodyAst, Inf, _} = p_t(Body, Ctx#js_ctx{action = get}, wrap_add_scope(Trav2)),
         Ast = erl_syntax:fun_expr([erl_syntax:clause([ArgsVar], none, append_asts(ArgsAst, BodyAst))]),
@@ -732,9 +746,9 @@ arguments_p_t([], Ctx, Trav) ->
     {{Args, _}, {_, Trav1}} = var_ast(arguments, Ctx#js_ctx{action = set}, Trav),
     {Args, [], Trav1};
 arguments_p_t(Params, Ctx, Trav) ->
-    {{Args, _}, {_, Trav1}} = var_ast(arguments, Ctx#js_ctx{action = set}, Trav),
-    {VarName, Trav2} = build_var_name("arguments_length", Trav1),
+    {VarName, Trav1} = build_var_name("arguments_length", Trav),
     ArgsLen = erl_syntax:variable(VarName),
+    {{Args, _}, {_, Trav2}} = var_ast(arguments, Ctx#js_ctx{action = set}, {arguments, [{length, ArgsLen}]}, Trav1),
     {Params1, _, Trav3} = p_t(Params, Ctx#js_ctx{action = set}, Trav2),
     Clauses = lists:map(
         fun(I) ->
