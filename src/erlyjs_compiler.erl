@@ -724,7 +724,6 @@ func(Name, Params, Body, Ctx, Trav) ->
     case Ctx#js_ctx.global of
     true->
         {ArgsVar, ArgsAst, Trav1} = arguments_p_t(Params, Ctx, Trav),
-
         {BodyAst, Inf, _} = p_t(Body, Ctx#js_ctx{action = get}, wrap_add_scope(Trav1)),
         Ast = erl_syntax:function(erl_syntax:atom(global_prefix(Name)),
                   [erl_syntax:clause([ArgsVar], none, append_asts(ArgsAst, BodyAst))]),
@@ -733,7 +732,6 @@ func(Name, Params, Body, Ctx, Trav) ->
                      erl_syntax:integer(1)),
         Exports = [Export | Inf#ast_inf.export_asts],
         {{Ast, Inf#ast_inf{export_asts = Exports}}, {Ctx, Trav1}};
-
     _ ->
         {{FunVar, _}, {_, Trav1}} = var_ast(Name, Ctx#js_ctx{action = set}, {function, [{length, erl_syntax:integer(length(Params))}]}, Trav),
         {ArgsVar, ArgsAst, Trav2} = arguments_p_t(Params, Ctx, Trav1),
@@ -743,7 +741,7 @@ func(Name, Params, Body, Ctx, Trav) ->
     end.
 
 arguments_p_t([], Ctx, Trav) ->
-    {{Args, _}, {_, Trav1}} = var_ast(arguments, Ctx#js_ctx{action = set}, Trav),
+    {{Args, _}, {_, Trav1}} = var_ast(arguments, Ctx#js_ctx{action = set}, {arguments, [{length, erl_syntax:integer(0)}]}, Trav),
     {Args, [], Trav1};
 arguments_p_t(Params, Ctx, Trav) ->
     {VarName, Trav1} = build_var_name("arguments_length", Trav),
