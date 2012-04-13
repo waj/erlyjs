@@ -34,6 +34,8 @@
 %% API
 -export([parse/1, parse_transform/1, compile/2, compile/3]).
 
+-import(erlyjs_global, [get_mod_func/3]).
+
 
 -record(js_ctx, {
     out_dir = "ebin",
@@ -821,76 +823,6 @@ call3(FuncAst, Ctx, Trav) ->
         [erl_syntax:tuple([erl_syntax:atom(error), erl_syntax:variable(VarErr)])]),
     Ast = erl_syntax:try_expr([FuncAst], [ClauseOk], [ClauseCatch]),
     maybe_global({{Ast, #ast_inf{}}, {Ctx, Trav3}}).
-
-
-get_mod_func(decodeURI, [], 1) -> {erlyjs_global, decodeURI};
-get_mod_func(decodeURIComponent, [], 1) -> {erlyjs_global, decodeURIComponent};
-get_mod_func(encodeURI, [], 1) -> {erlyjs_global, encodeURI};
-get_mod_func(encodeURIComponent, [], 1) -> {erlyjs_global, encodeURIComponent};
-get_mod_func(eval, [], 1) -> {erlyjs_global, eval};
-get_mod_func(eval, [], 2) -> {erlyjs_global, eval};
-get_mod_func(isFinite, [],1) -> {erlyjs_global, isFinite};
-get_mod_func(isNaN, [], 1) -> {erlyjs_global, isNaN};
-get_mod_func(parseInt, [], 1) -> {erlyjs_global, parseInt};
-get_mod_func(parseInt, [], 2) -> {erlyjs_global, parseInt};
-get_mod_func(parseFloat, [], 1) -> {erlyjs_global, parseFloat};
-%%
-get_mod_func('Date', [now], 0) -> {erlyjs_global_date, now};
-get_mod_func('Date', [parse], 1) -> {erlyjs_global_date, parse};
-%%
-get_mod_func('Math', [abs], 1) -> {erlyjs_global_math, abs};
-get_mod_func('Math', [acos], 1) -> {erlyjs_global_math, acos};
-get_mod_func('Math', [asin], 1) -> {erlyjs_global_math, asin};
-get_mod_func('Math', [atan], 1) -> {erlyjs_global_math, atan};
-get_mod_func('Math', [atan2], 2) -> {erlyjs_global_math, atan2};
-get_mod_func('Math', [ceil], 1) -> {erlyjs_global_math, ceil};
-get_mod_func('Math', [cos], 1) -> {erlyjs_global_math, cos};
-get_mod_func('Math', [exp], 1) -> {erlyjs_global_math, exp};
-get_mod_func('Math', [floor], 1) -> {erlyjs_global_math, floor};
-get_mod_func('Math', [log], 1) -> {erlyjs_global_math, log};
-get_mod_func('Math', [max], 2) -> {erlyjs_global_math, max};
-get_mod_func('Math', [min], 2) -> {erlyjs_global_math, min};
-get_mod_func('Math', [pow], 2) -> {erlyjs_global_math, pow};
-get_mod_func('Math', [random], 0) -> {erlyjs_global_math, random};
-get_mod_func('Math', [round], 1) -> {erlyjs_global_math, round};
-get_mod_func('Math', [sin], 1) -> {erlyjs_global_math, sin};
-get_mod_func('Math', [sqrt], 1) -> {erlyjs_global_math, sqrt};
-get_mod_func('Math', [tan], 1) -> {erlyjs_global_math, tan};
-%%
-get_mod_func('String', [charAt], 1) -> {erlyjs_global_string, charAt};
-get_mod_func('String', [charCodeAt], 1) -> {erlyjs_global_string, charCodeAt};
-get_mod_func('String', [concat], 1) -> {erlyjs_global_string, concat};
-%% get_mod_func('String', [indexOf], 2) -> {erlyjs_global_string, indexOf};   % ??? delete ???
-get_mod_func(Name, [indexOf], 1) -> {erlyjs_global_string, indexOf, Name};
-get_mod_func('String', [indexOf], 3) -> {erlyjs_global_string, indexOf};
-%% get_mod_func('String', [lastIndexOf], 2) -> {erlyjs_global_string, lastIndexOf};   % ??? delete ???
-get_mod_func(Name, [lastIndexOf], 1) -> {erlyjs_global_string, lastIndexOf, Name};
-get_mod_func('String', [lastIndexOf], 3) -> {erlyjs_global_string, lastIndexOf};
-get_mod_func('String', [localeCompare], 1) -> {erlyjs_global_string, localeCompare};
-get_mod_func('String', [match], 1) -> {erlyjs_global_string, match};
-get_mod_func('String', [replace], 2) -> {erlyjs_global_string, replace};
-get_mod_func('String', [search], 1) -> {erlyjs_global_string, search};
-get_mod_func('String', [slice], 1) -> {erlyjs_global_string, slice};
-get_mod_func('String', [slice], 2) -> {erlyjs_global_string, slice};
-get_mod_func('String', [split], 0) -> {erlyjs_global_string, split};
-get_mod_func('String', [split], 1) -> {erlyjs_global_string, split};
-get_mod_func('String', [split], 2) -> {erlyjs_global_string, split};
-get_mod_func('String', [substr], 1) -> {erlyjs_global_string, substr};
-get_mod_func('String', [substr], 2) -> {erlyjs_global_string, substr};
-get_mod_func('String', [substring], 1) -> {erlyjs_global_string, substring};
-get_mod_func('String', [substring], 2) -> {erlyjs_global_string, substring};
-get_mod_func('String', [toLocaleLowerCase], 0) -> {erlyjs_global_string, toLocaleLowerCase};
-%% get_mod_func('String', [toLocaleUpperCase], 0) -> {erlyjs_global_string, toLocaleUpperCase};  % ??? delete ???
-get_mod_func(Name, [toLowerCase], 0) -> {erlyjs_global_string, toLowerCase, Name};
-get_mod_func('String', [toString], 0) -> {erlyjs_global_string, toString};
-%% get_mod_func('String', [toUpperCase], 1) -> {erlyjs_global_string, toUpperCase};  % ??? delete ???
-get_mod_func(Name, [toUpperCase], 0) -> {erlyjs_global_string, toUpperCase, Name};
-get_mod_func('String', [valueOf], 0) -> {erlyjs_global_string, valueOf};
-%%
-get_mod_func(load, [], 1)  -> {erlyjs_api, load};
-get_mod_func(print, [], 1)  -> {erlyjs_api, print};
-%%
-get_mod_func(_, _, _) -> err.
 
 
 assign_ast('=', Name, _, Ast2, _, Ctx, #trav{js_scopes = [_]} = Trav) ->
