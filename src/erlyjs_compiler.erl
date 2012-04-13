@@ -635,11 +635,8 @@ get_vars_list(NameKeys, TravList, Trav, Ctx) ->
           erl_syntax:tuple(lists:map(
               fun(Key) ->
                   case dict:find(Key, hd(X#trav.names)) of
-                  {ok, {Val, _Metadata}} ->
-                     erl_syntax:variable(Val);
-                  error ->
-                     {{Ast, _}, {_, _}} = var_ast(Key, Ctx, Trav),
-                     Ast
+                  {ok, {Val, _Metadata}} -> erl_syntax:variable(Val);
+                  error -> element(1, element(1, var_ast(Key, Ctx, Trav)))
                   end
               end, NameKeys))
       end, TravList).
@@ -692,11 +689,13 @@ get_switch_clause_list(CaseList, Trav, Ctx) ->
                 {break, _} ->
                     StmtsIn2 = lists:reverse(tl(lists:reverse(StmtsIn))),
                     {LabelsOut, _, _} = p_t(LabelsIn, Ctx, AccTravIn2),
-                    Guards = erl_syntax:disjunction(lists:map(
-                        fun(Label) ->
-                            Ast = erl_syntax:variable("X"),
-                            erl_syntax:infix_expr(Ast, erl_syntax:operator('=='), Label)
-                        end, LabelsOut)),
+                    Guards = erl_syntax:disjunction(
+                        lists:map(
+                            fun(Label) ->
+                                erl_syntax:infix_expr(
+                                    erl_syntax:variable("X"),
+                                    erl_syntax:operator('=='), Label)
+                            end, LabelsOut)),
                     {StmtsOut, _, AccTravOut} = p_t(StmtsIn2, Ctx, AccTravIn2),
                     Names = dict:to_list(hd(AccTravOut#trav.names)),
                     {{erl_syntax:variable("X"), Guards, StmtsOut, Names, AccTravOut}, AccTravOut};
