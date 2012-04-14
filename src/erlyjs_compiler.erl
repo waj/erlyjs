@@ -31,43 +31,12 @@
 -module(erlyjs_compiler).
 -author('rsaccon@gmail.com').
 
--compile({no_auto_import, [float/1]}).
-
 %% API
 -export([parse/1, parse_transform/1, compile/2, compile/3]).
 
--import(erl_syntax, [atom/1, list/1, tuple/1, string/1, integer/1, float/1,
-    disjunction/1, application/2, application/3, attribute/2,
-    arity_qualifier/2, operator/1, infix_expr/3, try_expr/3, function/2,
-    fun_expr/1, case_expr/2, match_expr/2, block_expr/1, clause/3, revert/1,
-    variable/1, variable_literal/1, underscore/0, form_list/1, is_leaf/1]).
-
 -import(erlyjs_global, [get_mod_func/3]).
 
-
--record(js_ctx, {
-    out_dir = "ebin",
-    global = false,
-    args = [],
-    reader = {file, read_file},
-    action = get,
-    force_recompile = false,
-    module = [],
-    verbose = true}).
-
--record(ast_inf, {              %%  additional info about a parse transfomed AST
-    export_asts = [],           %%  Module header export statements
-    global_asts = [],           %%  Exported Erlang functions
-    internal_func_asts = []}).  %%  Internal Erlang functions
-
--record(scope, {                %%  represents a Javascript variable scope
-    var_dict = dict:new()}).    %%  Key: JsName, Value: {ErlName, Metadata}
-
--record(trav, {                 %%  traverses the whole tree
-    js_scopes = [#scope{}],     %%  for Javascript variables scopes
-    names = [],                 %%  for temporary use: [{JsNameAsKey, {ErlName, Metadata}}, ...]
-    var_counter = 0,            %%  for unique Erlang variable names
-    func_counter = 0}).         %%  for unique internal Erlang function names
+-include("erlyjs.hrl").
 
 
 compile(File, Module) ->
@@ -226,12 +195,21 @@ ast({identifier, _, false}, {Ctx, Trav}) ->
 ast({integer, _, Value}, {Ctx, Trav}) ->
     {{integer(Value), #ast_inf{}}, {Ctx, Trav}};
 ast({float, _, Value}, {Ctx, Trav}) ->
-    {{erl_syntax:float(Value), #ast_inf{}}, {Ctx, Trav}};
+    {{float(Value), #ast_inf{}}, {Ctx, Trav}};
 ast({string, _, Value}, {Ctx, Trav}) ->
     {{string(Value), #ast_inf{}}, {Ctx, Trav}}; %% TODO: binary instead of string
-ast({{'[', _L},  Value}, {Ctx, Trav}) ->
-    %% TODO: implementation and tests, this just works for empty lists
-    {{list(Value), #ast_inf{}}, {Ctx, Trav}};
+ast({{'[', _L}, Values}, CtxTrav) ->
+    {{erlyjs_array:new(Values), #ast_inf{}}, CtxTrav};
+ast({{{'[', _L}, Values}, [length]}, CtxTrav) ->
+    {{erlyjs_array:length(erlyjs_array:new(Values)), #ast_inf{}}, CtxTrav};
+ast({new, {identifier, _, 'Array'}}, CtxTrav) ->
+    {{erlyjs_array:new(), #ast_inf{}}, CtxTrav};
+ast({new, {identifier, _, 'Array'}, {'(', Values}}, CtxTrav) ->
+    {{erlyjs_array:new(Values), #ast_inf{}}, CtxTrav};
+ast({{new, {identifier, _, 'Array'}}, [length]}, CtxTrav) ->
+    {{integer(0), #ast_inf{}}, CtxTrav};
+ast({new, {identifier, _, 'Array'}, {'(', Values}, [length]}, CtxTrav) ->
+    {{erlyjs_array:length(erlyjs_array:new(Values)), #ast_inf{}}, CtxTrav};
 ast({{identifier, _, undefined}, _}, {Ctx, Trav}) ->
     {{atom(undefined), #ast_inf{}}, {Ctx, Trav}};
 ast({{identifier, _, 'Infinity'}, _}, {Ctx, Trav}) ->
@@ -250,16 +228,16 @@ ast({apply, Call, {'(', Args}}, {Ctx, Trav}) ->
     {{Ast, Inf}, {Ctx1, Trav1}} = ast(Call, {Ctx#js_ctx{action = get}, Trav}),
     {Args1, _, _} = p_t(Args, Ctx1, Trav1),
     {{application(none, Ast, [list(Args1)]), Inf}, {Ctx1, Trav1}};
-ast({{identifier, _, Name}, [length]}, {Ctx, Trav}) ->
-    {{{_Var, Metadata}, Inf}, _} = var_ast(Name, Ctx#js_ctx{action = get_all}, Trav),
+ast({{identifier, _, Name}, [Prop]}, {Ctx, Trav}) ->
+    {{{Var, Metadata}, Inf}, _} = var_ast(Name, Ctx#js_ctx{action = get_all}, Trav),
     case Metadata of
+    {array, _} when Prop =:= length ->
+        {{erlyjs_array:length(Var), Inf}, {Ctx, Trav}};
     {_, Props} ->
-        case proplists:get_value(length, Props) of
+        case proplists:get_value(Prop, Props) of
         undefined -> {{atom(undefined), Inf}, {Ctx, Trav}};
-        Length -> {{Length, Inf}, {Ctx, Trav}}
-        end;
-    _ ->
-        {{atom(undefined), Inf}, {Ctx, Trav}}
+        Value -> {{Value, Inf}, {Ctx, Trav}}
+        end
     end;
 ast({{identifier, _, Name}, Value}, {Ctx, Trav}) ->
     var_declare(Name, Value, Ctx, Trav);
@@ -483,7 +461,7 @@ var_ast(Key, #js_ctx{action = set} = Ctx, Metadata, Trav) ->
     {{variable(ErlName), #ast_inf{}}, {Ctx, Trav3}}.
 
 var_ast(Key, #js_ctx{action = set} = Ctx, Trav) ->
-    var_ast(Key, #js_ctx{action = set} = Ctx, {}, Trav);
+    var_ast(Key, #js_ctx{action = set} = Ctx, nil, Trav);
 var_ast(undefined, #js_ctx{action = get} = Ctx, Trav) ->
     {{atom(undefined), #ast_inf{}}, {Ctx, Trav}};
 var_ast('Infinity', #js_ctx{action = get} = Ctx, Trav) ->
@@ -526,7 +504,7 @@ var_declare(Key, {identifier, _, 'NaN'}, Ctx,  #trav{js_scopes = [_]}=Trav) ->
     Args = [atom(global_prefix(Key)), atom('NaN')],
     Ast = application(none, atom(put), Args),
     {{Ast,  #ast_inf{}}, {Ctx, Trav2}};
-var_declare(Key, Value, Ctx,  #trav{js_scopes = [GlobalScope]}=Trav) ->
+var_declare(Key, Value, Ctx, #trav{js_scopes = [GlobalScope]}=Trav) ->
     Dict = dict:store(Key, {global_prefix(Key), []}, GlobalScope#scope.var_dict),
     Trav2 = Trav#trav{js_scopes=[#scope{var_dict = Dict}]},
     {ValueAst, Inf, Trav3} = parse_transform(Value, Ctx, Trav2),
@@ -534,20 +512,32 @@ var_declare(Key, Value, Ctx,  #trav{js_scopes = [GlobalScope]}=Trav) ->
     Ast = application(none, atom(put), Args),
     {{append_asts(Inf#ast_inf.global_asts, Ast),  #ast_inf{}}, {Ctx, Trav3}};
 var_declare(Key, [], Ctx, Trav) ->
-    {{AstVariable, _}, {_, Trav2}}  = var_ast(Key, Ctx, Trav),
+    {{AstVariable, _}, {_, Trav2}} = var_ast(Key, Ctx, Trav),
     Ast = match_expr(AstVariable, atom(undefined)),
     {{Ast, #ast_inf{}}, {Ctx, Trav2}};
 var_declare(Key, {identifier, _, undefined}, Ctx, Trav) ->
-    {{AstVar, Inf}, {_, Trav2}}  = var_ast(Key, Ctx, Trav),
+    {{AstVar, Inf}, {_, Trav2}} = var_ast(Key, Ctx, Trav),
     {{match_expr(AstVar, atom(undefined)), Inf}, {Ctx, Trav2}};
 var_declare(Key, {identifier, _, 'Infinity'}, Ctx, Trav) ->
-    {{AstVar, Inf}, {_, Trav2}}  = var_ast(Key, Ctx, Trav),
+    {{AstVar, Inf}, {_, Trav2}} = var_ast(Key, Ctx, Trav),
     {{match_expr(AstVar, atom('Infinity')), Inf}, {Ctx, Trav2}};
 var_declare(Key, {identifier, _, 'NaN'}, Ctx, Trav) ->
-    {{AstVar, Inf}, {_, Trav2}}  = var_ast(Key, Ctx, Trav),
+    {{AstVar, Inf}, {_, Trav2}} = var_ast(Key, Ctx, Trav),
     {{match_expr(AstVar, atom('NaN')), Inf}, {Ctx, Trav2}};
 var_declare(Key, Value, Ctx, Trav) ->
-    {{AstVariable, _}, {_, Trav2}}  = var_ast(Key, Ctx, Trav),
+    Metadata = case element(1, Value) of
+    new ->
+        case element(3, element(2, Value)) of
+        'Array' -> {array, []};
+        _ -> nil
+        end;
+    function ->
+        {function, {params, Params, body, _Body}} = Value,
+        {function, [{length, integer(length(Params))}]};
+    _ ->
+        nil
+    end,
+    {{AstVariable, _}, {_, Trav2}} = var_ast(Key, Ctx, Metadata, Trav),
     {AstValue, Inf, Trav3} = parse_transform(Value, Ctx, Trav2),
     Ast = match_expr(AstVariable, AstValue),
     {{Ast, Inf}, {Ctx, Trav3}}.
@@ -630,45 +620,45 @@ get_vars_result(NameKeys, Trav, TravInit, Ctx) ->
 get_switch_clause_list(CaseList, Trav, Ctx) ->
     %% TODO: eliminate possibility of inner shadow variables
     lists:mapfoldl(
-        fun
-            ({default, StmtsIn}, AccTravIn) ->
-                AccTravIn2 = trav_reset(AccTravIn),
-                LabelOut = underscore(),
-                {StmtsOut, _, AccTravOut} = p_t(StmtsIn, Ctx, AccTravIn2),
+    fun
+        ({default, StmtsIn}, AccTravIn) ->
+            AccTravIn2 = trav_reset(AccTravIn),
+            LabelOut = underscore(),
+            {StmtsOut, _, AccTravOut} = p_t(StmtsIn, Ctx, AccTravIn2),
+            Names = dict:to_list(hd(AccTravOut#trav.names)),
+            {{LabelOut, none, StmtsOut, Names, AccTravOut}, AccTravOut};
+        ({[LabelIn], StmtsIn}, AccTravIn) ->
+            AccTravIn2 = trav_reset(AccTravIn),
+            case lists:last(StmtsIn) of
+            {break, _} ->
+                StmtsIn2 = lists:reverse(tl(lists:reverse(StmtsIn))),
+                {LabelOut, _, _} = p_t(LabelIn, Ctx, AccTravIn2),
+                {StmtsOut, _, AccTravOut} = p_t(StmtsIn2, Ctx, AccTravIn2),
                 Names = dict:to_list(hd(AccTravOut#trav.names)),
                 {{LabelOut, none, StmtsOut, Names, AccTravOut}, AccTravOut};
-            ({[LabelIn], StmtsIn}, AccTravIn) ->
-                AccTravIn2 = trav_reset(AccTravIn),
-                case lists:last(StmtsIn) of
-                {break, _} ->
-                    StmtsIn2 = lists:reverse(tl(lists:reverse(StmtsIn))),
-                    {LabelOut, _, _} = p_t(LabelIn, Ctx, AccTravIn2),
-                    {StmtsOut, _, AccTravOut} = p_t(StmtsIn2, Ctx, AccTravIn2),
-                    Names = dict:to_list(hd(AccTravOut#trav.names)),
-                    {{LabelOut, none, StmtsOut, Names, AccTravOut}, AccTravOut};
-                 _ ->
-                     exit(not_implemented_yet)
-                end;
-            ({LabelsIn, StmtsIn}, AccTravIn) ->
-                AccTravIn2 = trav_reset(AccTravIn),
-                case lists:last(StmtsIn) of
-                {break, _} ->
-                    StmtsIn2 = lists:reverse(tl(lists:reverse(StmtsIn))),
-                    {LabelsOut, _, _} = p_t(LabelsIn, Ctx, AccTravIn2),
-                    Guards = disjunction(
-                        lists:map(
-                            fun(Label) ->
-                                infix_expr(
-                                    variable("X"),
-                                    operator('=='), Label)
-                            end, LabelsOut)),
-                    {StmtsOut, _, AccTravOut} = p_t(StmtsIn2, Ctx, AccTravIn2),
-                    Names = dict:to_list(hd(AccTravOut#trav.names)),
-                    {{variable("X"), Guards, StmtsOut, Names, AccTravOut}, AccTravOut};
-                 _ ->
-                     exit(not_implemented_yet)
-                end
-        end, Trav, CaseList).
+             _ ->
+                 exit(not_implemented_yet)
+            end;
+        ({LabelsIn, StmtsIn}, AccTravIn) ->
+            AccTravIn2 = trav_reset(AccTravIn),
+            case lists:last(StmtsIn) of
+            {break, _} ->
+                StmtsIn2 = lists:reverse(tl(lists:reverse(StmtsIn))),
+                {LabelsOut, _, _} = p_t(LabelsIn, Ctx, AccTravIn2),
+                Guards = disjunction(
+                    lists:map(
+                        fun(Label) ->
+                            infix_expr(
+                                variable("X"),
+                                operator('=='), Label)
+                        end, LabelsOut)),
+                {StmtsOut, _, AccTravOut} = p_t(StmtsIn2, Ctx, AccTravIn2),
+                Names = dict:to_list(hd(AccTravOut#trav.names)),
+                {{variable("X"), Guards, StmtsOut, Names, AccTravOut}, AccTravOut};
+             _ ->
+                 exit(not_implemented_yet)
+            end
+    end, Trav, CaseList).
 
 
 sort_vars(Vars) ->

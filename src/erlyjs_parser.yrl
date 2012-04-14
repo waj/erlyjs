@@ -181,11 +181,11 @@ CallExpression -> PrimaryExpression : '$1'.
 CallExpression -> FullNewExpression : '$1'.
 CallExpression -> CallExpression MemberOperator : {'$1', list_third_el('$2')}.
 CallExpression -> CallExpression Arguments : funcall('$1', '$2').
-FullNewExpression -> new FullNewSubexpression Arguments : '$1'.
-ShortNewExpression -> new ShortNewSubexpression : '$1'.
+FullNewExpression -> new FullNewSubexpression Arguments : {new, '$2', '$3'}.
+FullNewExpression -> new FullNewSubexpression Arguments MemberOperator : {new, '$2', '$3', list_third_el('$4')}.
+ShortNewExpression -> new ShortNewSubexpression : {new, '$2'}.
 FullNewSubexpression -> PrimaryExpression : '$1'.
 FullNewSubexpression -> FullNewExpression : '$1'.
-FullNewSubexpression -> FullNewSubexpression MemberOperator : '$1' ++ ['$2'].
 ShortNewSubexpression -> FullNewSubexpression : '$1'.
 ShortNewSubexpression -> ShortNewExpression : '$1'.
 MemberOperator -> '[' Expression ']' : '$1'.
