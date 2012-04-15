@@ -1,10 +1,11 @@
 -compile({no_auto_import, [float/1]}).
 
--import(erl_syntax, [atom/1, list/1, tuple/1, binary/1, string/1, integer/1,
-    float/1, disjunction/1, application/2, application/3, attribute/2,
-    arity_qualifier/2, operator/1, infix_expr/3, try_expr/3, function/2,
-    fun_expr/1, case_expr/2, match_expr/2, block_expr/1, clause/3, revert/1,
-    variable/1, variable_literal/1, underscore/0, form_list/1, is_leaf/1]).
+-import(erl_syntax, [atom/1, list/1, tuple/1, binary/1, binary_field/1,
+    string/1, integer/1, float/1, disjunction/1, application/2, application/3,
+    attribute/2, arity_qualifier/2, operator/1, infix_expr/3, try_expr/3,
+    function/2, fun_expr/1, case_expr/2, match_expr/2, block_expr/1, clause/3,
+    revert_forms/1, variable/1, variable_literal/1, underscore/0, form_list/1,
+    is_leaf/1]).
 
 -record(js_ctx, {
     out_dir = "ebin",
@@ -29,3 +30,6 @@
     names = [],                 %%  for temporary use: [{JsNameAsKey, {ErlName, Metadata}}, ...]
     var_counter = 0,            %%  for unique Erlang variable names
     func_counter = 0}).         %%  for unique internal Erlang function names
+
+-define(b2l(Value), binary_to_list(Value)).
+-define(l2b(Value), list_to_binary(Value)).

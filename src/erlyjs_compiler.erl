@@ -57,8 +57,28 @@ compile(File, Module, Options) ->
             try p_t_root(JsParseTree, Ctx, #trav{}) of
                 {AstList, Info, _} ->
                     Forms = forms(CheckSum, Module, AstList, Info),
-                    trace(?MODULE, ?LINE, "Forms", Forms, Ctx),
-                    compile_forms(Forms, Ctx)
+                    RevertedForms = revert_forms(Forms),
+                    case Ctx#js_ctx.verbose of
+                    true ->
+                        trace(?MODULE, ?LINE, "Forms", RevertedForms, Ctx),
+                        io:format("Erlang source:~n~n"),
+                        Hook = fun (Node, Ctxt, Cont) ->
+                                    case erl_syntax:type(Node) of
+                                    binary ->
+                                        case erl_syntax:get_ann(Node) of
+                                        [] -> Cont(Node, Ctxt);
+                                        Anns ->  prettypr:text("<<\"" ++ hd(Anns) ++ "\">>")
+                                        end;
+                                    _ ->
+                                        Cont(Node, Ctxt)
+                                    end
+                               end,
+                        io:put_chars(erl_prettypr:format(form_list(Forms), [{hook, Hook}])),
+                        io:format("~n~n");
+                    _ ->
+                        ok
+                    end,
+                    compile_forms(RevertedForms, Ctx)
             catch
                 throw:Error ->
                     Error
@@ -134,7 +154,7 @@ forms(Checksum, Module, FuncAsts, Info) ->
     ExportReset = arity_qualifier(atom("jsreset"), integer(0)),
     ExportChecksum = arity_qualifier(atom("checksum"), integer(0)),
     ExportAst = attribute(atom(export), [list([ExportInit, ExportReset, ExportChecksum | Info#ast_inf.export_asts])]),
-    [revert(X) || X <- [ModuleAst, ExportAst, InitFuncAst, ResetFuncAst, ChecksumFuncAst | FuncAsts2]].
+    [ModuleAst, ExportAst, InitFuncAst, ResetFuncAst, ChecksumFuncAst | FuncAsts2].
 
 
 compile_forms(Forms, Ctx) ->
@@ -144,14 +164,6 @@ compile_forms(Forms, Ctx) ->
     end,
     case compile:forms(Forms, CompileOptions) of
     {ok, Module1, Bin} ->
-        case Ctx#js_ctx.verbose of
-        true ->
-            io:format("Erlang source:~n~n"),
-            io:put_chars(erl_prettypr:format(form_list(Forms))),
-            io:format("~n");
-        _ ->
-            ok
-        end,
         Path = filename:join([Ctx#js_ctx.out_dir, atom_to_list(Module1) ++ ".beam"]),
         case file:write_file(Path, Bin) of
         ok ->
@@ -197,7 +209,8 @@ ast({integer, _, Value}, {Ctx, Trav}) ->
 ast({float, _, Value}, {Ctx, Trav}) ->
     {{float(Value), #ast_inf{}}, {Ctx, Trav}};
 ast({string, _, Value}, {Ctx, Trav}) ->
-    {{string(Value), #ast_inf{}}, {Ctx, Trav}}; %% TODO: binary instead of string
+    Ast = binary(lists:map(fun (Val) -> binary_field(integer(Val)) end, Value)),
+    {{erl_syntax:add_ann(Value, Ast), #ast_inf{}}, {Ctx, Trav}};
 ast({{'[', _L}, Values}, CtxTrav) ->
     {{erlyjs_array:new(Values), #ast_inf{}}, CtxTrav};
 ast({{{'[', _L}, Values}, [length]}, CtxTrav) ->
@@ -218,8 +231,8 @@ ast({{identifier, _, 'NaN'}, _}, {Ctx, Trav}) ->
     {{atom('NaN'), #ast_inf{}}, {Ctx, Trav}};
 ast({identifier, _, Name}, {Ctx, Trav}) ->
     var_ast(Name, Ctx, Trav);
-ast({{{string, _, String}, Names}, {'(', Args}}, {Ctx, Trav}) ->
-    call(string, String, Names, Args, Ctx, Trav);
+ast({{{string, _, Value}, Names}, {'(', Args}}, {Ctx, Trav}) ->
+    call(string, Value, Names, Args, Ctx, Trav);
 ast({{{identifier, _, Name}, Names}, {'(', Args}}, {Ctx, Trav}) ->
     call(Name, Names, Args, Ctx, Trav);
 ast({apply, {identifier, _, Name} , {'(', Args}}, {Ctx, Trav}) ->
@@ -720,9 +733,10 @@ arguments_p_t(Params, Ctx, Trav) ->
 
 call(string, String, DotSepNames, Args, Ctx, Trav) ->
     Arity = length(Args),
+    StringAst = binary(lists:map(fun (Val) -> binary_field(integer(Val)) end, String)),
     case get_mod_func(String, DotSepNames, Arity) of
     {Mod, Func, _} ->
-        call2(Mod, Func, string(String), Args, Ctx, Trav);
+        call2(Mod, Func, erl_syntax:add_ann(String, StringAst), Args, Ctx, Trav);
     _ ->
         throw({error, lists:concat(["No such function: ",
             pprint_name("String", DotSepNames, Arity)])})

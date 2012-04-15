@@ -85,6 +85,8 @@
     parseFloat/1,
     get_mod_func/3]).
 
+-include("erlyjs.hrl").
+
 
 %%====================================================================
 %% API
@@ -104,15 +106,15 @@ decodeURIComponent(_Str) ->
 
 
 encodeURI(Str) ->
-    encode(Str, uri).
+    ?l2b(encode(?b2l(Str), uri)).
 
 
 encodeURIComponent(Str) ->
-    encode(Str, uri_component).
+    ?l2b(encode(?b2l(Str), uri_component)).
 
 
 %% TODO: variable mapping and bindings
-eval(Str) when is_list(Str) ->
+eval(Str) ->
     case erlyjs_compiler:parse(Str) of
         {ok, JsParseTree} ->
             try erlyjs_compiler:parse_transform(JsParseTree) of
@@ -156,16 +158,16 @@ isNaN('NaN') ->
 isNaN(X) when is_number(X) ->
     false;
 isNaN(X) ->
-    case isNaN(parseInt2(X)) of
+    case isNaN(parseInt(X)) of
         true ->
-            isNaN(parseFloat2(X));
+            isNaN(parseFloat(X));
         _ ->
             false
     end.
 
 
 parseInt(Str) ->
-    parseInt2(Str).
+    parseInt2(?b2l(Str)).
 
 
 parseInt(_Str, _Radix) ->
@@ -173,7 +175,7 @@ parseInt(_Str, _Radix) ->
 
 
 parseFloat(Str) ->
-    parseFloat2(Str).
+    parseFloat2(?b2l(Str)).
 
 
 get_mod_func(decodeURI, [], 1) -> {erlyjs_global, decodeURI};
