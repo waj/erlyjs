@@ -1,17 +1,17 @@
 // Mandatory. Return here a description of the test case.
 function test_description() {
-    return "function length";
+  return "array";
 }
 
 // Mandatory. Return here an array of arguments the testsuite will use
 // to invoke the test() function. For no arguments return an empty array.
 function test_args() {
-    return [];
+  return [];
 }
 
 // Mandatory. Return here the expected test result.
 function test_ok() {
-    return [];
+  return [];
 }
 
 // Optional. Provide here any global code.

@@ -60,6 +60,7 @@ Nonterminals
     ParenthesizedExpression
     FunctionExpression
     ArrayLiteral
+    Elision
     AnonymousFunction
     NamedFunction
     FieldList
@@ -151,7 +152,7 @@ SimpleExpression -> true : '$1'.
 SimpleExpression -> false : '$1'.
 SimpleExpression -> Number : '$1'.
 SimpleExpression -> string : '$1'.
-SimpleExpression -> identifier  : '$1'.
+SimpleExpression -> identifier : '$1'.
 SimpleExpression -> regexp : '$1'.
 SimpleExpression -> ParenthesizedExpression : '$1'.
 SimpleExpression -> ArrayLiteral : '$1'.
@@ -168,11 +169,14 @@ FieldList -> LiteralField : ['$1'].
 FieldList -> FieldList ',' LiteralField : '$1' ++ ['$3'].
 LiteralField -> identifier ':' AssignmentExpression : '$1'.
 
-%% Array Literals TODO
+%% Array Literals
+ArrayLiteral -> '[' Elision ']' : {'$1', '$2'}.
 ArrayLiteral -> '[' ElementList ']' : {'$1', '$2'}.
-ElementList -> '$empty' : [].
-ElementList -> ElementList ',' LiteralElement : '$1' ++ ['$3'].
-LiteralElement -> AssignmentExpression : '$1'.
+ArrayLiteral -> '[' ElementList ',' Elision ']' : '$2'.
+ElementList -> Elision AssignmentExpression : ['$2'].
+ElementList -> ElementList ',' Elision AssignmentExpression : '$1' ++ ['$4'].
+Elision -> '$empty' : [].
+Elision -> ',' Elision ',' : '$2'.
 
 %% Left-Side Expressions
 LeftSideExpression -> CallExpression : '$1'.

@@ -204,25 +204,8 @@ ast({identifier, _, true}, {Ctx, Trav}) ->
     {{atom(true), #ast_inf{}}, {Ctx, Trav}};
 ast({identifier, _, false}, {Ctx, Trav}) ->
     {{atom(false), #ast_inf{}}, {Ctx, Trav}};
-ast({integer, _, Value}, {Ctx, Trav}) ->
-    {{integer(Value), #ast_inf{}}, {Ctx, Trav}};
-ast({float, _, Value}, {Ctx, Trav}) ->
-    {{float(Value), #ast_inf{}}, {Ctx, Trav}};
-ast({string, _, Value}, {Ctx, Trav}) ->
-    Ast = binary_ast(Value),
-    {{add_ann(Value, Ast), #ast_inf{}}, {Ctx, Trav}};
-ast({{'[', _L}, Values}, CtxTrav) ->
-    {{erlyjs_array:new(Values), #ast_inf{}}, CtxTrav};
-ast({{{'[', _L}, Values}, [length]}, CtxTrav) ->
-    {{erlyjs_array:length(erlyjs_array:new(Values)), #ast_inf{}}, CtxTrav};
-ast({new, {identifier, _, 'Array'}}, CtxTrav) ->
-    {{erlyjs_array:new(), #ast_inf{}}, CtxTrav};
-ast({new, {identifier, _, 'Array'}, {'(', Values}}, CtxTrav) ->
-    {{erlyjs_array:new(Values), #ast_inf{}}, CtxTrav};
-ast({{new, {identifier, _, 'Array'}}, [length]}, CtxTrav) ->
-    {{integer(0), #ast_inf{}}, CtxTrav};
-ast({new, {identifier, _, 'Array'}, {'(', Values}, [length]}, CtxTrav) ->
-    {{erlyjs_array:length(erlyjs_array:new(Values)), #ast_inf{}}, CtxTrav};
+ast({identifier, _, null}, {Ctx, Trav}) ->
+    {{atom(null), #ast_inf{}}, {Ctx, Trav}};
 ast({{identifier, _, undefined}, _}, {Ctx, Trav}) ->
     {{atom(undefined), #ast_inf{}}, {Ctx, Trav}};
 ast({{identifier, _, 'Infinity'}, _}, {Ctx, Trav}) ->
@@ -231,6 +214,30 @@ ast({{identifier, _, 'NaN'}, _}, {Ctx, Trav}) ->
     {{atom('NaN'), #ast_inf{}}, {Ctx, Trav}};
 ast({identifier, _, Name}, {Ctx, Trav}) ->
     var_ast(Name, Ctx, Trav);
+ast({integer, _, Value}, {Ctx, Trav}) ->
+    {{integer(Value), #ast_inf{}}, {Ctx, Trav}};
+ast({float, _, Value}, {Ctx, Trav}) ->
+    {{float(Value), #ast_inf{}}, {Ctx, Trav}};
+ast({string, _, Value}, {Ctx, Trav}) ->
+    {{add_ann(Value, binary_ast(Value)), #ast_inf{}}, {Ctx, Trav}};
+ast({{'[', _L}, Values}, CtxTrav) ->
+    Ast = case Values of
+    [{integer, _, Length}] -> erlyjs_array:init_new(Length);
+    Values -> list(lists:map(fun(E) -> element(1, element(1, ast(E, CtxTrav))) end, Values))
+    end,
+    {{Ast, #ast_inf{}}, CtxTrav};
+ast({{{'[', L}, Values}, [length]}, CtxTrav) ->
+    ValuesAst = ast({{'[', L}, Values}, CtxTrav),
+    {{erlyjs_array:length(ValuesAst), #ast_inf{}}, CtxTrav};
+ast({new, {identifier, _, 'Array'}}, CtxTrav) ->
+    {{list([]), #ast_inf{}}, CtxTrav};
+ast({new, {identifier, L, 'Array'}, {'(', Values}}, CtxTrav) ->
+    ast({{'[', L}, Values}, CtxTrav);
+ast({{new, {identifier, _, 'Array'}}, [length]}, CtxTrav) ->
+    {{integer(0), #ast_inf{}}, CtxTrav};
+ast({new, {identifier, L, 'Array'}, {'(', Values}, [length]}, CtxTrav) ->
+    ValuesAst = ast({{'[', L}, Values}, CtxTrav),
+    {{erlyjs_array:length(ValuesAst), #ast_inf{}}, CtxTrav};
 ast({{{string, _, Value}, Names}, {'(', Args}}, {Ctx, Trav}) ->
     call(string, Value, Names, Args, Ctx, Trav);
 ast({{{identifier, _, Name}, Names}, {'(', Args}}, {Ctx, Trav}) ->

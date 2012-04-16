@@ -33,28 +33,13 @@
 -module(erlyjs_array).
 -author('klaus_trainer@posteo.de').
 
--export([new/0, new/1, length/1]).
+-export([init_new/1, length/1]).
 
 -include("erlyjs.hrl").
 
 
-new() ->
-    list([]).
-
-new([]) ->
-    list([]);
-new(Length) when is_integer(Length) ->
-    init_new(Length);
-new([Ast]) ->
-    case Ast of
-    {integer, _, Length} -> init_new(Length)
-    end.
-
 length(ArrayAst) ->
     application(none, atom(length), [ArrayAst]).
-
-
-%% internal API
 
 init_new(Length) ->
     list(array:to_list(

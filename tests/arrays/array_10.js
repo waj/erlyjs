@@ -11,7 +11,7 @@ function test_args() {
 
 // Mandatory. Return here the expected test result.
 function test_ok() {
-  return [];
+  return ["fööbär"];
 }
 
 // Optional. Provide here any global code.
@@ -21,5 +21,5 @@ function test_ok() {
 // Testsuite invokes this function with the arguments from test_args()
 // and compares the return value with the expected result from test_ok().
 function test() {
-  return new Array;
+  return new Array("fööbär");
 }
