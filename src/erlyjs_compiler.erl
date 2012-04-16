@@ -48,7 +48,7 @@ compile(File, Module, Options) ->
     case catch M:F(File) of
     {ok, Data} ->
         crypto:start(),
-        CheckSum = binary_to_list(crypto:sha(Data)),
+        CheckSum = crypto:sha(Data),
         case parse(CheckSum, Data, Ctx) of
         ok ->
             ok;
@@ -92,7 +92,7 @@ compile(File, Module, Options) ->
 
 
 parse(Data) when is_binary(Data) ->
-    parse(binary_to_list(Data));
+    parse(?b2l(Data));
 parse(Data) ->
     case erlyjs_scan:string(Data) of
     {ok, Tokens, _} -> erlyjs_parser:parse(Tokens);
@@ -148,7 +148,7 @@ forms(Checksum, Module, FuncAsts, Info) ->
             application(none, atom(get), [])]),
         atom(ok)],
     ResetFuncAst = function(atom("jsreset"), [clause([], none, ResetFuncAstBody)]),
-    ChecksumFuncAst = function(atom("checksum"), [clause([], none, [string(Checksum)])]),
+    ChecksumFuncAst = function(atom("checksum"), [clause([], none, [binary_ast(Checksum)])]),
     ModuleAst = attribute(atom(module), [atom(Module)]),
     ExportInit = arity_qualifier(atom("jsinit"), integer(0)),
     ExportReset = arity_qualifier(atom("jsreset"), integer(0)),
@@ -209,7 +209,7 @@ ast({integer, _, Value}, {Ctx, Trav}) ->
 ast({float, _, Value}, {Ctx, Trav}) ->
     {{float(Value), #ast_inf{}}, {Ctx, Trav}};
 ast({string, _, Value}, {Ctx, Trav}) ->
-    Ast = binary(lists:map(fun (Val) -> binary_field(integer(Val)) end, Value)),
+    Ast = binary_ast(Value),
     {{erl_syntax:add_ann(Value, Ast), #ast_inf{}}, {Ctx, Trav}};
 ast({{'[', _L}, Values}, CtxTrav) ->
     {{erlyjs_array:new(Values), #ast_inf{}}, CtxTrav};
@@ -733,7 +733,7 @@ arguments_p_t(Params, Ctx, Trav) ->
 
 call(string, String, DotSepNames, Args, Ctx, Trav) ->
     Arity = length(Args),
-    StringAst = binary(lists:map(fun (Val) -> binary_field(integer(Val)) end, String)),
+    StringAst = binary_ast(String),
     case get_mod_func(String, DotSepNames, Arity) of
     {Mod, Func, _} ->
         call2(Mod, Func, erl_syntax:add_ann(String, StringAst), Args, Ctx, Trav);
@@ -803,6 +803,12 @@ append_asts(Ast1, Ast2) when is_list(Ast2) ->
     lists:append([Ast1], Ast2);
 append_asts(Ast1, Ast2) ->
     [Ast1, Ast2].
+
+
+binary_ast(Value) when is_list(Value) ->
+    binary(lists:map(fun (Val) -> binary_field(integer(Val)) end, Value));
+binary_ast(Value) when is_binary(Value) ->
+    binary(lists:map(fun (Val) -> binary_field(integer(Val)) end, binary:bin_to_list(Value))).
 
 
 append_info(Info1, Info2) ->
