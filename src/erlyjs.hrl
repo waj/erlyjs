@@ -5,7 +5,7 @@
     attribute/2, arity_qualifier/2, operator/1, infix_expr/3, try_expr/3,
     function/2, fun_expr/1, case_expr/2, match_expr/2, block_expr/1, clause/3,
     revert_forms/1, variable/1, variable_literal/1, underscore/0, form_list/1,
-    is_leaf/1]).
+    type/1, is_leaf/1, add_ann/2, get_ann/1]).
 
 -record(js_ctx, {
     out_dir = "ebin",

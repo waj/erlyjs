@@ -119,8 +119,7 @@ eval(Str) ->
         {ok, JsParseTree} ->
             try erlyjs_compiler:parse_transform(JsParseTree) of
                 {ErlAstList, _, _} ->
-                    L = [erl_syntax:revert(X) || X <- ErlAstList],
-                    case  erl_eval:exprs(L, erl_eval:new_bindings()) of
+                    case erl_eval:exprs(revert_forms(ErlAstList), erl_eval:new_bindings()) of
                         {value, Value, _Bindings} ->
                             Value;
                         Err ->

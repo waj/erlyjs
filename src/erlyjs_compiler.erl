@@ -63,9 +63,9 @@ compile(File, Module, Options) ->
                         trace(?MODULE, ?LINE, "Forms", RevertedForms, Ctx),
                         io:format("Erlang source:~n~n"),
                         Hook = fun (Node, Ctxt, Cont) ->
-                                    case erl_syntax:type(Node) of
+                                    case type(Node) of
                                     binary ->
-                                        case erl_syntax:get_ann(Node) of
+                                        case get_ann(Node) of
                                         [] -> Cont(Node, Ctxt);
                                         Anns ->  prettypr:text("<<\"" ++ hd(Anns) ++ "\">>")
                                         end;
@@ -210,7 +210,7 @@ ast({float, _, Value}, {Ctx, Trav}) ->
     {{float(Value), #ast_inf{}}, {Ctx, Trav}};
 ast({string, _, Value}, {Ctx, Trav}) ->
     Ast = binary_ast(Value),
-    {{erl_syntax:add_ann(Value, Ast), #ast_inf{}}, {Ctx, Trav}};
+    {{add_ann(Value, Ast), #ast_inf{}}, {Ctx, Trav}};
 ast({{'[', _L}, Values}, CtxTrav) ->
     {{erlyjs_array:new(Values), #ast_inf{}}, CtxTrav};
 ast({{{'[', _L}, Values}, [length]}, CtxTrav) ->
@@ -736,7 +736,7 @@ call(string, String, DotSepNames, Args, Ctx, Trav) ->
     StringAst = binary_ast(String),
     case get_mod_func(String, DotSepNames, Arity) of
     {Mod, Func, _} ->
-        call2(Mod, Func, erl_syntax:add_ann(String, StringAst), Args, Ctx, Trav);
+        call2(Mod, Func, add_ann(String, StringAst), Args, Ctx, Trav);
     _ ->
         throw({error, lists:concat(["No such function: ",
             pprint_name("String", DotSepNames, Arity)])})

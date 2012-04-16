@@ -57,7 +57,6 @@ length(ArrayAst) ->
 %% internal API
 
 init_new(Length) ->
-    list(array:to_list(array:map(
-        fun(_, _) ->
-            erl_syntax:atom(undefined)
-        end, array:new(Length)))).
+    list(array:to_list(
+        array:map(
+            fun (_, _) -> atom(undefined) end, array:new(Length)))).
