@@ -746,9 +746,10 @@ arguments_p_t(Params, Ctx, Trav) ->
                     false -> atom(undefined)
                     end
                 end, lists:seq(1, length(Params1))),
-            clause([ArgsLen], Guard, [match_expr(list(Params1), list(ArgVals))])
+            clause([ArgsLen], Guard, [list(ArgVals)])
         end, lists:seq(length(Params1), 0, -1)),
-    {Args, case_expr(application(none, atom(length), [Args]), Clauses), Trav2}.
+    Ast = match_expr(list(Params1), case_expr(application(none, atom(length), [Args]), Clauses)),
+    {Args, Ast, Trav2}.
 
 
 call(string, String, DotSepNames, Args, Ctx, Trav) ->
