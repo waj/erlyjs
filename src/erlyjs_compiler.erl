@@ -220,24 +220,27 @@ ast({float, _, Value}, {Ctx, Trav}) ->
     {{float(Value), #ast_inf{}}, {Ctx, Trav}};
 ast({string, _, Value}, {Ctx, Trav}) ->
     {{add_ann(Value, binary_ast(Value)), #ast_inf{}}, {Ctx, Trav}};
-ast({{'[', _L}, Values}, CtxTrav) ->
-    Ast = case Values of
-    [{integer, _, Length}] -> erlyjs_array:init_new(Length);
-    Values -> list(lists:map(fun(E) -> element(1, element(1, ast(E, CtxTrav))) end, Values))
-    end,
+ast({'[', ','}, CtxTrav) ->
+    {{atom(undefined), #ast_inf{}}, CtxTrav};
+ast({'[', []}, CtxTrav) ->
+    {{list([]), #ast_inf{}}, CtxTrav};
+ast({'[', Values}, CtxTrav) ->
+    Ast = list(lists:map(fun(E) -> element(1, element(1, ast(E, CtxTrav))) end, Values)),
     {{Ast, #ast_inf{}}, CtxTrav};
-ast({{{'[', L}, Values}, [length]}, CtxTrav) ->
-    ValuesAst = ast({{'[', L}, Values}, CtxTrav),
-    {{erlyjs_array:length(ValuesAst), #ast_inf{}}, CtxTrav};
+ast({{'[', Values}, [length]}, CtxTrav) ->
+    ValuesAst = element(1, element(1, ast({'[', Values}, CtxTrav))),
+    {{erlyjs_array:get_length(ValuesAst), #ast_inf{}}, CtxTrav};
 ast({new, {identifier, _, 'Array'}}, CtxTrav) ->
     {{list([]), #ast_inf{}}, CtxTrav};
-ast({new, {identifier, L, 'Array'}, {'(', Values}}, CtxTrav) ->
-    ast({{'[', L}, Values}, CtxTrav);
+ast({new, {identifier, _, 'Array'}, {'(', [{integer, _, Length}]}}, CtxTrav) ->
+    {{erlyjs_array:init_new(Length), #ast_inf{}}, CtxTrav};
+ast({new, {identifier, _, 'Array'}, {'(', Values}}, CtxTrav) ->
+    ast({'[', Values}, CtxTrav);
 ast({{new, {identifier, _, 'Array'}}, [length]}, CtxTrav) ->
     {{integer(0), #ast_inf{}}, CtxTrav};
 ast({new, {identifier, L, 'Array'}, {'(', Values}, [length]}, CtxTrav) ->
-    ValuesAst = ast({{'[', L}, Values}, CtxTrav),
-    {{erlyjs_array:length(ValuesAst), #ast_inf{}}, CtxTrav};
+    ValuesAst = element(1, element(1, ast({new, {identifier, L, 'Array'}, {'(', Values}}, CtxTrav))),
+    {{erlyjs_array:get_length(ValuesAst), #ast_inf{}}, CtxTrav};
 ast({{{string, _, Value}, Names}, {'(', Args}}, {Ctx, Trav}) ->
     call(string, Value, Names, Args, Ctx, Trav);
 ast({{{identifier, _, Name}, Names}, {'(', Args}}, {Ctx, Trav}) ->
@@ -252,7 +255,7 @@ ast({{identifier, _, Name}, [Prop]}, {Ctx, Trav}) ->
     {{{Var, Metadata}, Inf}, _} = var_ast(Name, Ctx#js_ctx{action = get_all}, Trav),
     case Metadata of
     {array, _} when Prop =:= length ->
-        {{erlyjs_array:length(Var), Inf}, {Ctx, Trav}};
+        {{erlyjs_array:get_length(Var), Inf}, {Ctx, Trav}};
     {_, Props} ->
         case proplists:get_value(Prop, Props) of
         undefined -> {{atom(undefined), Inf}, {Ctx, Trav}};
@@ -307,6 +310,13 @@ ast({assign, {'=', _}, {identifier, _, Name}, In1}, {Ctx, Trav}) ->
     {{Out2, _}, {_, Trav1}} = var_ast(Name, Ctx#js_ctx{action = set}, Trav),
     {Out3, Inf, _} = p_t(In1, Ctx, Trav),
     assign_ast('=', Name, Out2, Out3, Inf, Ctx, Trav1);
+ast({assign, {'=', _}, {{identifier, _, Name}, [Prop]}, Ast}, {Ctx, Trav}) ->
+    {{{Var, Metadata}, Inf}, _} = var_ast(Name, Ctx#js_ctx{action = get_all}, Trav),
+    case Metadata of
+    {array, Props} when Prop =:= length ->
+        {{Var1, _}, {_, Trav1}} = var_ast(Name, Ctx#js_ctx{action = set}, {array, Props}, Trav),
+        {{match_expr(Var1, erlyjs_array:set_length(Var, Ast)), Inf}, {Ctx, Trav1}}
+    end;
 ast({assign, {Op, _}, {identifier, _, Name}, In1}, {Ctx, Trav}) ->
     {{Out2, _}, _} = var_ast(Name, Ctx, Trav),
     {Out3, Inf, Trav1} = p_t(In1, Ctx, Trav),
@@ -469,16 +479,18 @@ func_name(Trav) ->
 
 var_ast(Key, #js_ctx{action = set} = Ctx, Metadata, Trav) ->
     Scope = hd(Trav#trav.js_scopes),
-    {ErlName, Trav2} = build_var_name(Key, Trav),
+    {ErlName, Trav1} = {
+        lists:concat(["V", Trav#trav.var_counter, "_", Key]),
+        Trav#trav{var_counter = Trav#trav.var_counter + 1}},
     Dict = dict:store(Key, {ErlName, Metadata}, Scope#scope.var_dict),
-    Names = case Trav2#trav.names of
+    Names = case Trav1#trav.names of
     [] -> [];
     [H|T] -> [dict:store(Key, {ErlName, Metadata}, H) | T]
     end,
-    Trav3 = Trav2#trav{
+    Trav2 = Trav1#trav{
         js_scopes = [#scope{var_dict = Dict} | tl(Trav#trav.js_scopes)],
         names = Names},
-    {{variable(ErlName), #ast_inf{}}, {Ctx, Trav3}}.
+    {{variable(ErlName), #ast_inf{}}, {Ctx, Trav2}}.
 
 var_ast(Key, #js_ctx{action = set} = Ctx, Trav) ->
     var_ast(Key, #js_ctx{action = set} = Ctx, nil, Trav);
@@ -551,6 +563,8 @@ var_declare(Key, Value, Ctx, Trav) ->
         'Array' -> {array, []};
         _ -> nil
         end;
+    '[' ->
+        {array, []};
     function ->
         {function, {params, Params, body, _Body}} = Value,
         {function, [{length, integer(length(Params))}]};
@@ -719,10 +733,9 @@ arguments_p_t([], Ctx, Trav) ->
     {{Args, _}, {_, Trav1}} = var_ast(arguments, Ctx#js_ctx{action = set}, {arguments, [{length, integer(0)}]}, Trav),
     {Args, [], Trav1};
 arguments_p_t(Params, Ctx, Trav) ->
-    {VarName, Trav1} = build_var_name("arguments_length", Trav),
-    ArgsLen = variable(VarName),
-    {{Args, _}, {_, Trav2}} = var_ast(arguments, Ctx#js_ctx{action = set}, {arguments, [{length, ArgsLen}]}, Trav1),
-    {Params1, _, Trav3} = p_t(Params, Ctx#js_ctx{action = set}, Trav2),
+    ArgsLen = ?gensym("ArgumentsLength"),
+    {{Args, _}, {_, Trav1}} = var_ast(arguments, Ctx#js_ctx{action = set}, {arguments, [{length, ArgsLen}]}, Trav),
+    {Params1, _, Trav2} = p_t(Params, Ctx#js_ctx{action = set}, Trav1),
     Clauses = lists:map(
         fun(I) ->
             Guard = infix_expr(ArgsLen, operator('>='), integer(I)),
@@ -735,7 +748,7 @@ arguments_p_t(Params, Ctx, Trav) ->
                 end, lists:seq(1, length(Params1))),
             clause([ArgsLen], Guard, [match_expr(list(Params1), list(ArgVals))])
         end, lists:seq(length(Params1), 0, -1)),
-    {Args, case_expr(application(none, atom(length), [Args]), Clauses), Trav3}.
+    {Args, case_expr(application(none, atom(length), [Args]), Clauses), Trav2}.
 
 
 call(string, String, DotSepNames, Args, Ctx, Trav) ->
@@ -775,12 +788,11 @@ call2(Mod, Func, Arg, Args, Ctx, Trav) ->
     call3(FuncAst, Ctx, Trav2).
 
 call3(FuncAst, Ctx, Trav) ->
-    {VarVal, Trav2} = build_var_name("Val", Trav),
-    {VarErr, Trav3} = build_var_name("Err", Trav2),
-    ClauseOk = clause([variable(VarVal)], none, [variable(VarVal)]),
-    ClauseCatch = clause([variable(VarErr)], none, [tuple([atom(error), variable(VarErr)])]),
-    Ast = try_expr([FuncAst], [ClauseOk], [ClauseCatch]),
-    maybe_global({{Ast, #ast_inf{}}, {Ctx, Trav3}}).
+    VarVal = ?gensym("Val"),
+    VarErr = ?gensym("Err"),
+    ClauseOk = clause([VarVal], none, [VarVal]),
+    ClauseCatch = clause([VarErr], none, [tuple([atom(error), VarErr])]),
+    maybe_global({{try_expr([FuncAst], [ClauseOk], [ClauseCatch]), #ast_inf{}}, {Ctx, Trav}}).
 
 
 assign_ast('=', Name, _, Ast2, _, Ctx, #trav{js_scopes = [_]} = Trav) ->
@@ -832,11 +844,6 @@ assign_to_op(Assign) ->
 
 global_prefix(Name) ->
     lists:concat(["js_", Name]).
-
-
-build_var_name(Key, Trav) ->
-   ErlName = lists:concat(["V", Trav#trav.var_counter, "_", Key]),
-   {ErlName, Trav#trav{var_counter = Trav#trav.var_counter + 1}}.
 
 
 %% TODO: eliminate

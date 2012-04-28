@@ -33,15 +33,42 @@
 -module(erlyjs_array).
 -author('klaus_trainer@posteo.de').
 
--export([init_new/1, length/1]).
+-export([init_new/1, get_length/1, set_length/2]).
 
 -include("erlyjs.hrl").
 
 
-length(ArrayAst) ->
+get_length(ArrayAst) ->
     application(none, atom(length), [ArrayAst]).
+
+set_length(ArrayAst, LengthAst) ->
+    CaseArg = get_length(ArrayAst),
+    LengthVar = ?gensym("Length"),
+    Clauses = [
+        clause(
+            [LengthVar],
+            [infix_expr(LengthVar, operator('>='), LengthAst)],
+            [application(atom(lists), atom(sublist), [ArrayAst, LengthAst])]),
+        clause(
+            [LengthVar],
+            [infix_expr(LengthVar, operator('<'), LengthAst)],
+            [application(atom(lists), atom(append), [ArrayAst,
+                init_new_ast(infix_expr(LengthAst, operator('-'), LengthVar))])])
+    ],
+    case_expr(CaseArg, Clauses).
 
 init_new(Length) ->
     list(array:to_list(
         array:map(
             fun (_, _) -> atom(undefined) end, array:new(Length)))).
+
+init_new_ast(LengthAst) ->
+    application(
+        atom(array),
+        atom(to_list),
+        [
+            application(
+                atom(array),
+                atom(new),
+                [LengthAst])
+        ]).

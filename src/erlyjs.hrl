@@ -33,3 +33,5 @@
 
 -define(b2l(Value), binary_to_list(Value)).
 -define(l2b(Value), list_to_binary(Value)).
+
+-define(gensym(Name), erl_syntax:variable(Name ++ "_" ++ lists:concat(tuple_to_list(now())))).

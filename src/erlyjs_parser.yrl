@@ -61,6 +61,7 @@ Nonterminals
     FunctionExpression
     ArrayLiteral
     Elision
+    ElisionOpt
     AnonymousFunction
     NamedFunction
     FieldList
@@ -170,13 +171,16 @@ FieldList -> FieldList ',' LiteralField : '$1' ++ ['$3'].
 LiteralField -> identifier ':' AssignmentExpression : '$1'.
 
 %% Array Literals
-ArrayLiteral -> '[' Elision ']' : {'$1', '$2'}.
-ArrayLiteral -> '[' ElementList ']' : {'$1', '$2'}.
-ArrayLiteral -> '[' ElementList ',' Elision ']' : '$2'.
-ElementList -> Elision AssignmentExpression : ['$2'].
-ElementList -> ElementList ',' Elision AssignmentExpression : '$1' ++ ['$4'].
-Elision -> '$empty' : [].
-Elision -> ',' Elision ',' : '$2'.
+ArrayLiteral -> '[' ElisionOpt ']' : {'[', '$2'}.
+ArrayLiteral -> '[' ElementList ']' :  {'[', '$2'}.
+ArrayLiteral -> '[' ElementList ',' ElisionOpt ']' : {'[', lists:flatten('$2' ++ '$4')}.
+ElementList -> ElisionOpt AssignmentExpression : '$1' ++ ['$2'].
+ElementList -> ElementList ',' ElisionOpt AssignmentExpression : '$1' ++ '$3' ++ ['$4'].
+ElisionOpt -> '$empty' : [].
+ElisionOpt -> ',' : [{'[', ','}].
+ElisionOpt -> Elision ',' : ['$1', {'[', ','}].
+Elision -> ',' : [{'[', ','}].
+Elision -> Elision ',' : ['$1', {'[', ','}].
 
 %% Left-Side Expressions
 LeftSideExpression -> CallExpression : '$1'.
