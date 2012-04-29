@@ -238,7 +238,7 @@ ast({new, {identifier, _, 'Array'}, {'(', Values}}, CtxTrav) ->
     ast({'[', Values}, CtxTrav);
 ast({{new, {identifier, _, 'Array'}}, [length]}, CtxTrav) ->
     {{integer(0), #ast_inf{}}, CtxTrav};
-ast({new, {identifier, L, 'Array'}, {'(', Values}, [length]}, CtxTrav) ->
+ast({{new, {identifier, L, 'Array'}, {'(', Values}}, [length]}, CtxTrav) ->
     ValuesAst = element(1, element(1, ast({new, {identifier, L, 'Array'}, {'(', Values}}, CtxTrav))),
     {{erlyjs_array:get_length(ValuesAst), #ast_inf{}}, CtxTrav};
 ast({{{string, _, Value}, Names}, {'(', Args}}, {Ctx, Trav}) ->
@@ -571,7 +571,7 @@ var_declare(Key, Value, Ctx, Trav) ->
     _ ->
         nil
     end,
-    {{AstVariable, _}, {_, Trav2}} = var_ast(Key, Ctx, Metadata, Trav),
+    {{AstVariable, _}, {_, Trav2}} = var_ast(Key, Ctx#js_ctx{action = set}, Metadata, Trav),
     {AstValue, Inf, Trav3} = parse_transform(Value, Ctx, Trav2),
     Ast = match_expr(AstVariable, AstValue),
     {{Ast, Inf}, {Ctx, Trav3}}.

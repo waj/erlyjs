@@ -45,16 +45,12 @@ Nonterminals
     LeftSideExpression
     CallExpression
     PrimaryExpression
-    MemberOperator
+    MemberExpression
     Arguments
-    FullNewExpression
-    FullNewSubexpression
-    ShortNewSubexpression
-    ShortNewExpression
+    NewExpression
     Expression
     ArgumentList
     AssignmentExpression
-    SimpleExpression
     ObjectLiteral
     RegularExpression
     ParenthesizedExpression
@@ -67,7 +63,6 @@ Nonterminals
     FieldList
     LiteralField
     ElementList
-    LiteralElement
     OptionalExpression
     Number
     ConditionalExpression
@@ -144,19 +139,18 @@ Number -> float : '$1'.
 Number -> integer : '$1'.
 
 %% Primary Expressions
-PrimaryExpression -> SimpleExpression : '$1'.
-PrimaryExpression -> FunctionExpression : '$1'.
+PrimaryExpression -> this : '$1'.
+PrimaryExpression -> null : '$1'.
+PrimaryExpression -> true : '$1'.
+PrimaryExpression -> false : '$1'.
+PrimaryExpression -> Number : '$1'.
+PrimaryExpression -> string : '$1'.
+PrimaryExpression -> identifier : '$1'.
+PrimaryExpression -> regexp : '$1'.
+PrimaryExpression -> ParenthesizedExpression : '$1'.
+PrimaryExpression -> ArrayLiteral : '$1'.
 PrimaryExpression -> ObjectLiteral : '$1'.
-SimpleExpression -> this : '$1'.
-SimpleExpression -> null : '$1'.
-SimpleExpression -> true : '$1'.
-SimpleExpression -> false : '$1'.
-SimpleExpression -> Number : '$1'.
-SimpleExpression -> string : '$1'.
-SimpleExpression -> identifier : '$1'.
-SimpleExpression -> regexp : '$1'.
-SimpleExpression -> ParenthesizedExpression : '$1'.
-SimpleExpression -> ArrayLiteral : '$1'.
+
 ParenthesizedExpression -> '(' Expression ')' : '$2'.
 
 %% Function Expressions
@@ -183,22 +177,21 @@ Elision -> ',' : [{'[', ','}].
 Elision -> Elision ',' : ['$1', {'[', ','}].
 
 %% Left-Side Expressions
+LeftSideExpression -> NewExpression : '$1'.
 LeftSideExpression -> CallExpression : '$1'.
-LeftSideExpression -> ShortNewExpression : '$1'.
-CallExpression -> PrimaryExpression : '$1'.
-CallExpression -> FullNewExpression : '$1'.
-CallExpression -> CallExpression MemberOperator : {'$1', list_third_el('$2')}.
+CallExpression -> MemberExpression Arguments : funcall('$1', '$2').
 CallExpression -> CallExpression Arguments : funcall('$1', '$2').
-FullNewExpression -> new FullNewSubexpression Arguments : {new, '$2', '$3'}.
-FullNewExpression -> new FullNewSubexpression Arguments MemberOperator : {new, '$2', '$3', list_third_el('$4')}.
-ShortNewExpression -> new ShortNewSubexpression : {new, '$2'}.
-FullNewSubexpression -> PrimaryExpression : '$1'.
-FullNewSubexpression -> FullNewExpression : '$1'.
-ShortNewSubexpression -> FullNewSubexpression : '$1'.
-ShortNewSubexpression -> ShortNewExpression : '$1'.
-MemberOperator -> '[' Expression ']' : '$1'.
-MemberOperator -> '.' identifier : ['$2'].
-MemberOperator ->  MemberOperator '.' identifier : '$1' ++ ['$3'].
+CallExpression -> CallExpression '[' Expression ']' : {'$1', {'[', ['$3']}}.
+
+NewExpression -> MemberExpression : '$1'.
+NewExpression -> new NewExpression : {new, '$2'}.
+
+MemberExpression -> PrimaryExpression : '$1'.
+MemberExpression -> FunctionExpression : '$1'.
+MemberExpression -> MemberExpression '[' Expression ']' : {'$1', {'[', '$3'}}.
+MemberExpression -> MemberExpression '.' identifier : {'$1', [element(3, '$3')]}.
+MemberExpression -> new MemberExpression Arguments : {new, '$2', '$3'}.
+
 Arguments -> '(' ')' : {'(', []}.
 Arguments -> '(' ArgumentList ')' : {'(', '$2'}.
 ArgumentList -> AssignmentExpression : ['$1'].
@@ -420,8 +413,6 @@ TopStatement -> FunctionDefinition  : '$1'.
 Erlang code.
 
 postfix({Op, Line}) -> {Op, postfix, Line}.
-
-list_third_el(L) ->  [X || {identifier, _ , X} <- L].
 
 funcall(Call, Args) when size(Call) =:= 3 -> {apply, Call, Args};
 funcall(Call, Args) -> {Call, Args}.
