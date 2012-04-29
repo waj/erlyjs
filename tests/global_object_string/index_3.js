@@ -1,6 +1,6 @@
 // Mandatory. Provide here a description of the test case.
 function test_description() {
-    return "Predefined core object 'String', method: 'indexOf'";
+    return "string index";
 }
 
 // Mandatory. Provide here the arguments the testsuite will use
@@ -11,7 +11,7 @@ function test_args() {
 
 // Mandatory. Provide here the expected test result.
 function test_ok() {
-    return 0;
+    return "F";
 }
 
 // Optional. Provide here any global code.
@@ -21,6 +21,7 @@ function test_ok() {
 // Testsuite invokes this function with the arguments from test_args()
 // and compares the return value with the expected result from test_result().
 function test() {
-    var a = "Blue Whale";
-    return a.indexOf("Blue");
+    var a = "Foo",
+      b = a["0"];
+    return b;
 }

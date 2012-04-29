@@ -242,7 +242,18 @@ ast({{new, {identifier, L, 'Array'}, {'(', Values}}, [length]}, CtxTrav) ->
     ValuesAst = element(1, element(1, ast({new, {identifier, L, 'Array'}, {'(', Values}}, CtxTrav))),
     {{erlyjs_array:get_length(ValuesAst), #ast_inf{}}, CtxTrav};
 ast({Object, {'[]', Value}}, {Ctx, Trav}) ->
-    member(Object, Value, Ctx, Trav);
+    Value1 = case Value of
+    {string, L, Val} ->
+        try list_to_integer(Val) of
+            Int -> {integer, L, Int}
+        catch
+            error:badarg -> Value
+        end;
+    _ ->
+        Value
+    end,
+    ValueAst = element(1, element(1, ast(Value1, {Ctx, Trav}))),
+    member(Object, ValueAst, Ctx, Trav);
 ast({{{string, _, Value}, Names}, {'(', Args}}, {Ctx, Trav}) ->
     call(string, Value, Names, Args, Ctx, Trav);
 ast({{{identifier, _, Name}, Names}, {'(', Args}}, {Ctx, Trav}) ->
@@ -258,6 +269,8 @@ ast({{identifier, _, Name}, [Prop]}, {Ctx, Trav}) ->
     case Metadata of
     {array, _} when Prop =:= length ->
         {{erlyjs_array:get_length(Var), Inf}, {Ctx, Trav}};
+    {string, _} when Prop =:= length ->
+        {{application(none, atom(size), [Var]), Inf}, {Ctx, Trav}};
     {_, Props} ->
         case proplists:get_value(Prop, Props) of
         undefined -> {{atom(undefined), Inf}, {Ctx, Trav}};
@@ -570,6 +583,8 @@ var_declare(Key, Value, Ctx, Trav) ->
     function ->
         {function, {params, Params, body, _Body}} = Value,
         {function, [{length, integer(length(Params))}]};
+    string ->
+        {string, []};
     _ ->
         nil
     end,
@@ -579,26 +594,30 @@ var_declare(Key, Value, Ctx, Trav) ->
     {{Ast, Inf}, {Ctx, Trav3}}.
 
 
-member(Object, Value, Ctx, Trav) ->
-    {Array, Inf} = case Object of
+member(Object, ValueAst, Ctx, Trav) ->
+    case Object of
     {identifier, _, Name} ->
-        {{{Var, Metadata}, Inf0}, _} = var_ast(Name, Ctx#js_ctx{action = get_all}, Trav),
+        {{{Var, Metadata}, _}, _} = var_ast(Name, Ctx#js_ctx{action = get_all}, Trav),
         case Metadata of
-        {array, _} -> {Var, Inf0}
+        {array, _} -> array_member(Var, ValueAst, Ctx, Trav);
+        {arguments, _} -> array_member(Var, ValueAst, Ctx, Trav);
+        {string, _} -> string_member(Var, ValueAst, Ctx, Trav)
         end;
     {'[', Values} ->
-        element(1, ast({'[', Values}, {Ctx, Trav}))
-    end,
-    Value1 = element(1, element(1, ast(Value, {Ctx, Trav}))),
-    Value2 = case type(Value1) of
-    binary ->
-        application(none, atom(list_to_integer),
-            [application(none, atom(binary_to_list), [Value1])]);
-    _ ->
-        Value1
-    end,
-    Value3 = infix_expr(Value2, operator('+'), integer(1)),
-    {{application(atom(lists), atom(nth), [Value3, Array]), Inf}, {Ctx, Trav}}.
+        Array = element(1, element(1, ast({'[', Values}, {Ctx, Trav}))),
+        array_member(Array, ValueAst, Ctx, Trav)
+    end.
+
+array_member(ArrayAst, ValueAst, Ctx, Trav) ->
+    ValueAst1 = infix_expr(ValueAst, operator('+'), integer(1)),
+    {{application(atom(lists), atom(nth), [ValueAst1, ArrayAst]), #ast_inf{}}, {Ctx, Trav}}.
+
+string_member(StringAst, ValueAst, Ctx, Trav) ->
+    ValueAst1 = infix_expr(ValueAst, operator('+'), integer(1)),
+    StringAst1 = application(none, atom(binary_to_list), [StringAst]),
+    ResultAst = application(none, atom(list_to_binary),
+        [list([application(atom(lists), atom(nth), [ValueAst1, StringAst1])])]),
+    {{ResultAst, #ast_inf{}}, {Ctx, Trav}}.
 
 
 name_search(_, [], _) ->
