@@ -284,10 +284,8 @@ CompoundAssignment -> '^=' : '$1'.
 CompoundAssignment -> '|=' : '$1'.
 
 %% Expressions
-%% Expression -> AssignmentExpression : ['$1'].                             % not working
-%% Expression -> Expression ',' AssignmentExpression : '$1' ++ ['$3'].      % not working
-Expression -> AssignmentExpression : '$1'.                                  % ok, but shouldn't
-Expression -> Expression ',' AssignmentExpression : ['$1', '$3'].           % ?????????????????
+Expression -> AssignmentExpression : '$1'.
+Expression -> Expression ',' AssignmentExpression : ['$1', '$3'].
 
 OptionalExpression -> Expression : '$1'.
 OptionalExpression -> '$empty' : [].
