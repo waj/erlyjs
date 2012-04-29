@@ -407,7 +407,7 @@ ast({while, Cond, Stmt}, {#js_ctx{global = true} = Ctx, Trav}) ->
     Trav2 = Trav#trav{
         var_counter = VarCounter,
         names = add_names(Trav),
-        func_counter = wrap_inc_func_counter(Trav)},
+        func_counter = Trav#trav.func_counter + 1},
     {OutStmt, _, Trav3} = p_t(Stmt, Ctx, Trav2),
     AstFuncCond = case_expr(OutCond, [
         clause([atom(true)], none, append_asts(OutStmt, application(none, func_name(Trav3), []))),
@@ -420,7 +420,7 @@ ast({while, Cond, Stmt}, {Ctx, Trav}) ->
     Trav2 = Trav#trav{
         var_counter = VarCounter,
         names = add_names(Trav),
-        func_counter = wrap_inc_func_counter(Trav)},
+        func_counter = Trav#trav.func_counter + 1},
     {OutStmt, _, Trav3} = p_t(Stmt, Ctx, Trav2),
     VarsBefore = get_vars_init(Trav, Trav3, Ctx),
     VarsAfterStmt = get_vars_snapshot(Trav3),
@@ -903,9 +903,6 @@ trav_prepare_func(Trav) ->
 trav_clean(Trav) -> Trav#trav{names = tl(Trav#trav.names)}.
 
 trav_reset(Trav) -> Trav#trav{names = [dict:new() | tl(Trav#trav.names)]}.
-
-%% TODO: eliminate
-wrap_inc_func_counter(Trav) -> Trav#trav.func_counter + 1.
 
 wrap_add_scope(Trav) -> Trav#trav{js_scopes = [#scope{} | Trav#trav.js_scopes]}.
 
