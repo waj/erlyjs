@@ -188,7 +188,7 @@ NewExpression -> new NewExpression : {new, '$2'}.
 
 MemberExpression -> PrimaryExpression : '$1'.
 MemberExpression -> FunctionExpression : '$1'.
-MemberExpression -> MemberExpression '[' Expression ']' : {'$1', {'[', '$3'}}.
+MemberExpression -> MemberExpression '[' Expression ']' : {'$1', {'[]', '$3'}}.
 MemberExpression -> MemberExpression '.' identifier : {'$1', [element(3, '$3')]}.
 MemberExpression -> new MemberExpression Arguments : {new, '$2', '$3'}.
 

@@ -241,6 +241,8 @@ ast({{new, {identifier, _, 'Array'}}, [length]}, CtxTrav) ->
 ast({{new, {identifier, L, 'Array'}, {'(', Values}}, [length]}, CtxTrav) ->
     ValuesAst = element(1, element(1, ast({new, {identifier, L, 'Array'}, {'(', Values}}, CtxTrav))),
     {{erlyjs_array:get_length(ValuesAst), #ast_inf{}}, CtxTrav};
+ast({Object, {'[]', Value}}, {Ctx, Trav}) ->
+    member(Object, Value, Ctx, Trav);
 ast({{{string, _, Value}, Names}, {'(', Args}}, {Ctx, Trav}) ->
     call(string, Value, Names, Args, Ctx, Trav);
 ast({{{identifier, _, Name}, Names}, {'(', Args}}, {Ctx, Trav}) ->
@@ -575,6 +577,28 @@ var_declare(Key, Value, Ctx, Trav) ->
     {AstValue, Inf, Trav3} = parse_transform(Value, Ctx, Trav2),
     Ast = match_expr(AstVariable, AstValue),
     {{Ast, Inf}, {Ctx, Trav3}}.
+
+
+member(Object, Value, Ctx, Trav) ->
+    {Array, Inf} = case Object of
+    {identifier, _, Name} ->
+        {{{Var, Metadata}, Inf0}, _} = var_ast(Name, Ctx#js_ctx{action = get_all}, Trav),
+        case Metadata of
+        {array, _} -> {Var, Inf0}
+        end;
+    {'[', Values} ->
+        element(1, ast({'[', Values}, {Ctx, Trav}))
+    end,
+    Value1 = element(1, element(1, ast(Value, {Ctx, Trav}))),
+    Value2 = case type(Value1) of
+    binary ->
+        application(none, atom(list_to_integer),
+            [application(none, atom(binary_to_list), [Value1])]);
+    _ ->
+        Value1
+    end,
+    Value3 = infix_expr(Value2, operator('+'), integer(1)),
+    {{application(atom(lists), atom(nth), [Value3, Array]), Inf}, {Ctx, Trav}}.
 
 
 name_search(_, [], _) ->
