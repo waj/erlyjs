@@ -1,11 +1,13 @@
+REBAR:=$(shell which rebar || echo ./rebar)
+
 all: compile
 
 compile:
-	rebar compile
+	@$(REBAR) compile
 
 clean:
 	rm -rf erl_crash.dump
-	rebar clean
+	@$(REBAR) clean
 
 check: compile
 	erl -pa ebin -noshell -run erlyjs_testsuite run -s init stop
